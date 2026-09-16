@@ -80,6 +80,10 @@ The scanner functions as an isolated domain service inside `src/core/scanner/`:
 - **Claude Scanner (`claude.ts`)**:
   - Parses `~/.claude/settings.json` for configured skills.
   - Parses `~/.claude/mcp.json` for active MCP servers.
+- **Workflow Scanner (`workflows.ts`)**:
+  - Traverses Gemini global workflows (`~/.gemini/config/global_workflows/`) and workspace workflows (`.agent/workflows/`, `.agents/workflows/`).
+  - Traverses Claude custom commands (`~/.claude/commands/`, `.claude/commands/`).
+  - Extracts frontmatter metadata (command trigger syntax, argument hints, allowed tools, model) and raw prompt instructions.
 - **Scanner Coordinator (`index.ts`)**:
   - Executes parallel directory reads using `Promise.allSettled`.
   - Tolerates missing directories, unreadable files, or malformed JSON/YAML payloads without throwing unhandled exceptions.
@@ -94,6 +98,8 @@ The Node.js HTTP server binds strictly to `127.0.0.1:3900`:
 - `GET /api/skills`: Returns array of normalized `SkillManifest` records and total count.
 - `GET /api/skills/:id`: Returns specific skill record including `rawContent` and parsed metadata. Returns 404 if not found.
 - `GET /api/mcp`: Returns array of normalized `McpServerManifest` records and total count.
+- `GET /api/workflows`: Returns array of normalized `WorkflowManifest` records and total count.
+- `GET /api/workflows/:id`: Returns specific workflow record including `rawContent`, command trigger, argument hint, and tool permissions. Returns 404 if not found.
 
 ---
 
@@ -101,10 +107,12 @@ The Node.js HTTP server binds strictly to `127.0.0.1:3900`:
 
 The React client adopts the GitHub Primer design system:
 
-- **Dashboard Shell (`App.tsx`)**: Header status indicator (`● Connected to 127.0.0.1:3900`), manual refresh action, light/dark theme toggle, and UnderlineNav tabs.
-- **Discovery Table (`DiscoveryTable.tsx`)**: Instant client-side filtering across skill names, ecosystems, and paths, with badge indicators (`Label--accent` for Gemini, `Label--done` for Claude).
+- **Dashboard Shell (`App.tsx`)**: Header status indicator (`● Connected to 127.0.0.1:3900`), manual refresh action, light/dark theme toggle, and UnderlineNav tabs (Skills, Workflows, MCP Servers, Conflicts, Settings).
+- **Discovery Table (`DiscoveryTable.tsx`)**: Instant client-side filtering across skill and workflow names, commands, ecosystems, and paths, with badge indicators (`Label--accent` for Gemini, `Label--done` for Claude, `Label--secondary` for scope).
 - **Skill Detail View (`SkillDetailView.tsx`)**: Dedicated inspection view featuring `← Back to Discovery` breadcrumb navigation, two-column responsive layout, and metadata summary card.
-- **Markdown Viewer (`MarkdownViewer.tsx`)**: Primer README-style container rendering `SKILL.md` markdown via `marked`.
+- **Workflow Detail View (`WorkflowDetailView.tsx`)**: Dedicated inspection view featuring invocation syntax display, argument hints, tool permission badges, and raw prompt instruction panel.
+- **Markdown Viewer (`MarkdownViewer.tsx`)**: Primer README-style container rendering `SKILL.md` and workflow markdown via `marked`.
+
 
 ---
 

@@ -75,7 +75,8 @@ flowchart LR
 
 ## Features
 
-- **Global Discovery**: Automatically scan global configurations from Gemini CLI, AntiGravity (AGY), Codex, Claude Code, and Cloud Code.
+- **Global Discovery**: Automatically scan global and workspace configurations from Gemini CLI, AntiGravity (AGY), Codex, Claude Code, and Cloud Code for skills, custom workflows, and MCP servers.
+- **Workflow & Slash Command Support**: Discover and inspect custom slash commands across Gemini CLI (`~/.gemini/config/global_workflows/`, `.agent/workflows/`) and Claude Code (`~/.claude/commands/`, `.claude/commands/`) with dedicated syntax hints and permission views.
 - **Central Storage & Symlinking**: Consolidate scattered configurations into `~/.koskill/` and manage symlinks to target environments transparently. User can pick and choose which one they want to leave in the original config or move / symlink to ~/.koskill
 - **Conflict & Duplicate Detection**: Identify conflicting instructions, duplicate MCP tools, and name collisions across ecosystems.
 - **Resolution Workflows**: Interactively choose preferred definitions, set workspace overrides, or merge complementary configs.

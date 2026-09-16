@@ -80,3 +80,50 @@ export function isValidMcpServerManifest(item: unknown): item is McpServerManife
     typeof m.declaredToolsCount === 'number'
   );
 }
+
+/**
+ * Scope hierarchy for configuration items and workflows.
+ */
+export type WorkflowScope = 'global' | 'workspace';
+
+/**
+ * Parsed metadata for a workflow or slash command.
+ */
+export interface WorkflowMetadata {
+  argumentHint?: string;
+  allowedTools?: string[];
+  model?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Manifest declaration for a workflow or custom slash command.
+ */
+export interface WorkflowManifest {
+  id: string;
+  name: string;
+  command: string; // e.g. "/commit"
+  description: string;
+  sourcePath: string;
+  targetEcosystem: ConfigTarget;
+  scope: WorkflowScope;
+  metadata?: WorkflowMetadata;
+  rawContent?: string;
+}
+
+/**
+ * Validates if an unknown input matches the WorkflowManifest contract.
+ */
+export function isValidWorkflowManifest(item: unknown): item is WorkflowManifest {
+  if (!item || typeof item !== 'object') return false;
+  const w = item as Partial<WorkflowManifest>;
+  return (
+    typeof w.id === 'string' && w.id.trim().length > 0 &&
+    typeof w.name === 'string' && w.name.trim().length > 0 &&
+    typeof w.command === 'string' && w.command.startsWith('/') &&
+    typeof w.sourcePath === 'string' &&
+    ['gemini', 'claude', 'codex'].includes(w.targetEcosystem as string) &&
+    ['global', 'workspace'].includes(w.scope as string)
+  );
+}
+

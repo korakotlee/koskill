@@ -1,8 +1,9 @@
 import path from 'path';
 import os from 'os';
-import { SkillManifest, McpServerManifest } from '../types.js';
+import { SkillManifest, McpServerManifest, WorkflowManifest } from '../types.js';
 import { scanGeminiSkills, scanGeminiMcp } from './gemini.js';
 import { scanClaudeSkills, scanClaudeMcp } from './claude.js';
+import { scanWorkflows, WorkflowScanOptions } from './workflows.js';
 import { defaultLogger } from '../logger.js';
 
 export interface InventoryOptions {
@@ -10,19 +11,22 @@ export interface InventoryOptions {
   geminiMcpFiles?: string[];
   claudeSettingsFiles?: string[];
   claudeMcpFiles?: string[];
+  workflowOptions?: WorkflowScanOptions;
 }
 
 export interface InventoryResult {
   skills: SkillManifest[];
   mcpServers: McpServerManifest[];
+  workflows: WorkflowManifest[];
   totalSkills: number;
   totalMcpServers: number;
+  totalWorkflows: number;
 }
 
 /**
  * Resolves standard default inspection paths across user home and workspace.
  */
-export function getDefaultPaths(): Required<InventoryOptions> {
+export function getDefaultPaths(): Required<Omit<InventoryOptions, 'workflowOptions'>> {
   const homeDir = os.homedir();
   const cwd = process.cwd();
 
@@ -66,9 +70,12 @@ export async function scanAllInventory(options?: InventoryOptions): Promise<Inve
     ...claudeMcpFiles.map((file) => scanClaudeMcp(file))
   ];
 
-  const [skillResults, mcpResults] = await Promise.all([
+  const workflowPromise = scanWorkflows(options?.workflowOptions);
+
+  const [skillResults, mcpResults, workflowResult] = await Promise.all([
     Promise.allSettled(skillPromises),
-    Promise.allSettled(mcpPromises)
+    Promise.allSettled(mcpPromises),
+    workflowPromise
   ]);
 
   const skillsMap = new Map<string, SkillManifest>();
@@ -95,14 +102,19 @@ export async function scanAllInventory(options?: InventoryOptions): Promise<Inve
 
   const skills = Array.from(skillsMap.values());
   const mcpServers = Array.from(mcpMap.values());
+  const workflows = workflowResult;
 
   return {
     skills,
     mcpServers,
+    workflows,
     totalSkills: skills.length,
-    totalMcpServers: mcpServers.length
+    totalMcpServers: mcpServers.length,
+    totalWorkflows: workflows.length
   };
 }
 
 export * from './gemini.js';
 export * from './claude.js';
+export * from './workflows.js';
+

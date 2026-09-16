@@ -87,5 +87,56 @@ export async function handleDiscoveryRoutes(
     }
   }
 
+  // GET /api/workflows
+  if (url.pathname === '/api/workflows') {
+    try {
+      const inventory = await scanAllInventory();
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        workflows: inventory.workflows,
+        total: inventory.totalWorkflows
+      }));
+      return true;
+    } catch (err: any) {
+      defaultLogger.error('Failed to handle /api/workflows', { error: err.message });
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: 'Internal Server Error', message: err.message }));
+      return true;
+    }
+  }
+
+  // GET /api/workflows/:id
+  if (url.pathname.startsWith('/api/workflows/')) {
+    const rawId = url.pathname.slice('/api/workflows/'.length);
+    const workflowId = decodeURIComponent(rawId);
+
+    if (!workflowId) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: 'Missing workflow identifier' }));
+      return true;
+    }
+
+    try {
+      const inventory = await scanAllInventory();
+      const workflow = inventory.workflows.find((w) => w.id === workflowId);
+
+      if (!workflow) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Workflow not found', id: workflowId }));
+        return true;
+      }
+
+      res.writeHead(200);
+      res.end(JSON.stringify(workflow));
+      return true;
+    } catch (err: any) {
+      defaultLogger.error(`Failed to handle /api/workflows/${workflowId}`, { error: err.message });
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: 'Internal Server Error', message: err.message }));
+      return true;
+    }
+  }
+
   return false;
 }
+

@@ -107,15 +107,16 @@ koskill/
 ├── _tickets/                  # Task tracking (pending and completed)
 ├── src/                       # Source codebase
 │   ├── core/                  # Core domain models, contracts, and logger
-│   │   ├── __tests__/         # Core unit tests
+│   │   ├── scanner/           # Discovery scanner for Gemini and Claude
 │   │   ├── logger.ts          # Centralized structured logger
 │   │   └── types.ts           # Shared domain types and type guards
 │   ├── server/                # Node.js HTTP daemon
-│   │   ├── __tests__/         # Server integration tests
+│   │   ├── routes/            # REST API route handlers
 │   │   └── index.ts           # Server entrypoint and health route
 │   └── client/                # Vite + React frontend dashboard
 │       ├── index.html         # Frontend HTML entrypoint
-│       └── src/               # React components and GitHub Primer CSS
+│       └── src/               # React components, styles, and tests
+├── tests/                     # Automated unit, route, and component tests
 ├── AGENTS.md                  # Operational rules and coding invariants for AI agents
 ├── CHANGELOG.md               # Release notes following Keep a Changelog
 ├── package.json               # Root workspace manifest and scripts

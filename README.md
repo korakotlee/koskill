@@ -100,24 +100,27 @@ flowchart LR
 ```text
 koskill/
 ├── .agent/                    # Agent workflows and custom skill definitions
-│   └── skills/                # Project-specific automation skills
 ├── docs/                      # Architectural, design, and user guides
-│   ├── images/                # Screenshots and visual diagrams
-│   ├── design.md              # UI/UX, tokens, and styling specifications
-│   ├── learning.md            # Post-mortems, bug resolutions, and learnings
-│   ├── project.md             # High-level implementation plan and roadmap
-│   ├── technical-guide.md     # Technical reference and developer manual
-│   └── user-guide.md          # User manual and configuration guide
 ├── log/                       # Operational and agent trace logs
-│   └── agent.log              # Agent run and interaction logs
+│   └── agent.log              # Agent run and structured logs
 ├── openspec/                  # Spec-driven development changes and specs
-│   ├── changes/               # Active change proposals
-│   ├── specs/                 # Baseline capability specifications
-│   └── config.yaml            # OpenSpec context and schema config
 ├── _tickets/                  # Task tracking (pending and completed)
-│   └── done/                  # Completed ticket archive
+├── src/                       # Source codebase
+│   ├── core/                  # Core domain models, contracts, and logger
+│   │   ├── __tests__/         # Core unit tests
+│   │   ├── logger.ts          # Centralized structured logger
+│   │   └── types.ts           # Shared domain types and type guards
+│   ├── server/                # Node.js HTTP daemon
+│   │   ├── __tests__/         # Server integration tests
+│   │   └── index.ts           # Server entrypoint and health route
+│   └── client/                # Vite + React frontend dashboard
+│       ├── index.html         # Frontend HTML entrypoint
+│       └── src/               # React components and GitHub Primer CSS
 ├── AGENTS.md                  # Operational rules and coding invariants for AI agents
 ├── CHANGELOG.md               # Release notes following Keep a Changelog
+├── package.json               # Root workspace manifest and scripts
+├── tsconfig.json              # TypeScript strict configuration
+├── vite.config.ts             # Vite build and Vitest configuration
 └── README.md                  # Project overview and documentation index
 ```
 
@@ -128,7 +131,7 @@ koskill/
 ### Prerequisites
 
 - [Node.js](https://nodejs.org) (v18.0.0 or higher recommended)
-- `npm` or `pnpm`
+- `npm`
 
 ### Quick Start (CLI)
 
@@ -148,11 +151,11 @@ cd koskill
 # Install dependencies
 npm install
 
-# Start development server (Node API + Vite frontend)
+# Start development server (Node API on port 3900 + Vite frontend on port 5173)
 npm run dev
 ```
 
-Open your browser to `http://127.0.0.1:3000` to access the local dashboard.
+Open your browser to `http://localhost:5173` to access the local dashboard.
 
 ---
 

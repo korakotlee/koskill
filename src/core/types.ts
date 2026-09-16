@@ -19,6 +19,7 @@ export interface SkillManifest {
   targetEcosystem: ConfigTarget;
   status: SkillStatus;
   metadata?: Record<string, unknown>;
+  rawContent?: string;
 }
 
 /**

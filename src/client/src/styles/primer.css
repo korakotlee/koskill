@@ -1,0 +1,102 @@
+/* GitHub Primer Design System Tokens & Utilities */
+:root, [data-color-mode="light"] {
+  --color-canvas-default: #ffffff;
+  --color-canvas-subtle: #f6f8fa;
+  --color-canvas-inset: #eff2f5;
+  --color-border-default: #d0d7de;
+  --color-border-muted: #d8dee4;
+  --color-fg-default: #1f2328;
+  --color-fg-muted: #656d76;
+  --color-accent-fg: #0969da;
+  --color-accent-subtle: #ddf4ff;
+  --color-success-fg: #1a7f37;
+  --color-success-subtle: #dafbe1;
+  --color-success-emphasis: #1f883d;
+  --color-attention-fg: #9a6700;
+  --color-attention-subtle: #fff8c5;
+  --color-danger-fg: #cf222e;
+  --color-danger-subtle: #ffebe9;
+  --color-done-fg: #8250df;
+  --color-done-subtle: #fbefff;
+  --color-counter-bg: rgba(175, 184, 193, 0.2);
+  --border-radius-small: 6px;
+  --border-radius-medium: 8px;
+  --border-radius-full: 9999px;
+  --box-shadow-card: 0 1px 0 rgba(31, 35, 40, 0.04);
+}
+
+[data-color-mode="dark"], body.dark {
+  --color-canvas-default: #0d1117;
+  --color-canvas-subtle: #161b22;
+  --color-canvas-inset: #010409;
+  --color-border-default: #30363d;
+  --color-border-muted: #21262d;
+  --color-fg-default: #e6edf3;
+  --color-fg-muted: #848d97;
+  --color-accent-fg: #2f81f7;
+  --color-accent-subtle: rgba(56, 139, 253, 0.15);
+  --color-success-fg: #3fb950;
+  --color-success-subtle: rgba(46, 160, 67, 0.15);
+  --color-success-emphasis: #238636;
+  --color-attention-fg: #d29922;
+  --color-attention-subtle: rgba(187, 128, 9, 0.15);
+  --color-danger-fg: #f85149;
+  --color-danger-subtle: rgba(248, 81, 73, 0.15);
+  --color-done-fg: #a371f7;
+  --color-done-subtle: rgba(163, 113, 247, 0.15);
+  --color-counter-bg: rgba(110, 118, 129, 0.4);
+  --box-shadow-card: 0 1px 0 rgba(1, 4, 9, 0.4);
+}
+
+/* Markdown Container Styles */
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-fg-default);
+}
+
+.markdown-body h1 {
+  font-size: 20px;
+  border-bottom: 1px solid var(--color-border-muted);
+  padding-bottom: 6px;
+}
+
+.markdown-body h2 {
+  font-size: 16px;
+  border-bottom: 1px solid var(--color-border-muted);
+  padding-bottom: 4px;
+}
+
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol {
+  margin-bottom: 12px;
+}
+
+.markdown-body code {
+  padding: 0.2em 0.4em;
+  font-size: 85%;
+  background-color: var(--color-canvas-subtle);
+  border-radius: var(--border-radius-small);
+  font-family: monospace;
+}
+
+.markdown-body pre {
+  padding: 12px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: var(--color-canvas-subtle);
+  border-radius: var(--border-radius-small);
+  border: 1px solid var(--color-border-default);
+  margin-bottom: 12px;
+}
+
+.markdown-body pre code {
+  padding: 0;
+  background-color: transparent;
+}

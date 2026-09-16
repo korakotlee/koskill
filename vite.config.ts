@@ -31,6 +31,6 @@ export default defineConfig({
     environment: 'jsdom',
     passWithNoTests: true,
     root: path.resolve(__dirname, '.'),
-    include: ['src/**/*.{test,spec}.{ts,tsx}']
+    include: ['src/**/*.{test,spec}.{ts,tsx}', 'tests/**/*.{test,spec}.{ts,tsx}']
   }
 } as any);

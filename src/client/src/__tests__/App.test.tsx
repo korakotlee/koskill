@@ -7,8 +7,10 @@ describe('KoSkill Primer Dashboard Shell', () => {
     document.documentElement.removeAttribute('data-color-mode');
   });
 
-  it('renders cockpit header with title and badges', () => {
+  it('renders cockpit header with title and badges linked to home', () => {
     render(<App />);
+    const brandLink = screen.getByRole('link', { name: /KoSkill Logo KoSkill/i });
+    expect(brandLink.getAttribute('href')).toBe('/');
     expect(screen.getByText('KoSkill')).toBeDefined();
     expect(screen.getByText('v0.1.0')).toBeDefined();
   });
@@ -50,5 +52,19 @@ describe('KoSkill Primer Dashboard Shell', () => {
     render(<App />);
     const boxHeaders = screen.getAllByText(/Registered Skills/i);
     expect(boxHeaders.length).toBeGreaterThan(0);
+  });
+
+  it('navigates to skill detail view and back to discovery dashboard', () => {
+    render(<App />);
+    const skillBtn = screen.getByRole('button', { name: /gemini-coder/i });
+    fireEvent.click(skillBtn);
+
+    expect(screen.getByRole('button', { name: /Back to Discovery/i })).toBeDefined();
+    expect(screen.getByText(/Documentation \(SKILL\.md\)/i)).toBeDefined();
+
+    const backBtn = screen.getByRole('button', { name: /Back to Discovery/i });
+    fireEvent.click(backBtn);
+
+    expect(screen.getByRole('button', { name: /Skills/i })).toBeDefined();
   });
 });

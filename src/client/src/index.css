@@ -246,3 +246,16 @@ body {
   color: var(--color-done-fg);
   border: 1px solid rgba(130, 80, 223, 0.3);
 }
+
+.Label--accent {
+  background-color: var(--color-accent-subtle);
+  color: var(--color-accent-fg);
+  border: 1px solid rgba(9, 105, 218, 0.3);
+}
+
+.Label--secondary {
+  background-color: var(--color-canvas-subtle);
+  color: var(--color-fg-muted);
+  border: 1px solid var(--color-border-default);
+}
+

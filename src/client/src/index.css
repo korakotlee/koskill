@@ -1,3 +1,5 @@
+@import './styles/primer.css';
+
 /* GitHub Primer Design System Variables */
 :root, [data-color-mode="light"] {
   --color-canvas-default: #ffffff;
@@ -77,6 +79,14 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.App-header-brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
 }
 
 .App-header-title {

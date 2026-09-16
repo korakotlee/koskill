@@ -1,66 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './index.css';
-import { SkillManifest, McpServerManifest } from '../../core/types.js';
+import { SkillManifest, McpServerManifest, WorkflowManifest } from '../../core/types.js';
 import { DiscoveryTable } from './components/DiscoveryTable.js';
 import { SkillDetailView } from './components/SkillDetailView.js';
+import { WorkflowDetailView } from './components/WorkflowDetailView.js';
+import { initialSkills, initialMcp, initialWorkflows } from './mockData.js';
 
-type Tab = 'skills' | 'mcp' | 'conflicts' | 'settings';
-
-const initialSkills: SkillManifest[] = [
-  {
-    id: 'gemini:gemini-coder',
-    name: 'gemini-coder',
-    description: 'Agent coding workflow and automation rules',
-    sourcePath: '~/.gemini/config/skills/gemini-coder/SKILL.md',
-    targetEcosystem: 'gemini',
-    status: 'symlinked',
-    rawContent: '# Gemini Coder\n\nAgent coding workflow and automation rules.'
-  },
-  {
-    id: 'claude:claude-architect',
-    name: 'claude-architect',
-    description: 'Architectural analysis and system design skill',
-    sourcePath: '~/.claude/settings.json',
-    targetEcosystem: 'claude',
-    status: 'original',
-    rawContent: '# Claude Architect\n\nArchitectural analysis and system design skill.'
-  },
-  {
-    id: 'codex:codex-refactor',
-    name: 'codex-refactor',
-    description: 'Clean code refactoring and test-driven development',
-    sourcePath: '~/.config/codex/skills/codex-refactor',
-    targetEcosystem: 'codex',
-    status: 'symlinked',
-    rawContent: '# Codex Refactor\n\nClean code refactoring and test-driven development.'
-  }
-];
-
-const initialMcp: McpServerManifest[] = [
-  {
-    id: 'gemini:github-tools',
-    name: 'github-tools',
-    transport: 'stdio',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-github'],
-    declaredToolsCount: 14
-  },
-  {
-    id: 'claude:postgres-mcp',
-    name: 'postgres-mcp',
-    transport: 'stdio',
-    command: 'docker',
-    args: ['run', '-i', 'mcp/postgres'],
-    declaredToolsCount: 8
-  }
-];
+type Tab = 'skills' | 'workflows' | 'mcp' | 'conflicts' | 'settings';
 
 export default function App(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<Tab>('skills');
   const [colorMode, setColorMode] = useState<'light' | 'dark'>('light');
   const [skills, setSkills] = useState<SkillManifest[]>(initialSkills);
   const [mcpServers, setMcpServers] = useState<McpServerManifest[]>(initialMcp);
+  const [workflows, setWorkflows] = useState<WorkflowManifest[]>(initialWorkflows);
   const [selectedSkill, setSelectedSkill] = useState<SkillManifest | null>(null);
+  const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowManifest | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
@@ -75,9 +30,10 @@ export default function App(): React.ReactElement {
   const fetchInventory = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [skillsRes, mcpRes] = await Promise.all([
+      const [skillsRes, mcpRes, workflowsRes] = await Promise.all([
         fetch('/api/skills'),
-        fetch('/api/mcp')
+        fetch('/api/mcp'),
+        fetch('/api/workflows')
       ]);
 
       if (skillsRes.ok) {
@@ -91,6 +47,13 @@ export default function App(): React.ReactElement {
         const mcpData = await mcpRes.json();
         if (Array.isArray(mcpData.servers)) {
           setMcpServers(mcpData.servers);
+        }
+      }
+
+      if (workflowsRes.ok) {
+        const workflowsData = await workflowsRes.json();
+        if (Array.isArray(workflowsData.workflows)) {
+          setWorkflows(workflowsData.workflows);
         }
       }
 
@@ -165,6 +128,11 @@ export default function App(): React.ReactElement {
             skill={selectedSkill}
             onBack={() => setSelectedSkill(null)}
           />
+        ) : selectedWorkflow ? (
+          <WorkflowDetailView
+            workflow={selectedWorkflow}
+            onBack={() => setSelectedWorkflow(null)}
+          />
         ) : (
           <>
             {/* Underline Navigation */}
@@ -175,6 +143,13 @@ export default function App(): React.ReactElement {
                 onClick={() => setActiveTab('skills')}
               >
                 Skills <span className="Counter">{skills.length}</span>
+              </button>
+              <button
+                type="button"
+                className={`UnderlineNav-item ${activeTab === 'workflows' ? 'selected' : ''}`}
+                onClick={() => setActiveTab('workflows')}
+              >
+                Workflows <span className="Counter">{workflows.length}</span>
               </button>
               <button
                 type="button"
@@ -204,6 +179,13 @@ export default function App(): React.ReactElement {
               <DiscoveryTable
                 skills={skills}
                 onSelectSkill={(skill) => setSelectedSkill(skill)}
+              />
+            )}
+
+            {activeTab === 'workflows' && (
+              <DiscoveryTable
+                workflows={workflows}
+                onSelectWorkflow={(wf) => setSelectedWorkflow(wf)}
               />
             )}
 

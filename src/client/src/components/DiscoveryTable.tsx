@@ -1,20 +1,43 @@
 import React, { useState, useMemo } from 'react';
 import { SkillManifest, WorkflowManifest } from '../../../core/types.js';
+import { BatchActionBar } from './BatchActionBar.js';
+import { CentralizeConfirmModal, ConfirmModalItem } from './CentralizeConfirmModal.js';
+import { WorkflowTableRows } from './WorkflowTableRows.js';
+import { SkillTableRows } from './SkillTableRows.js';
 
 export interface DiscoveryTableProps {
   skills?: SkillManifest[];
   workflows?: WorkflowManifest[];
   onSelectSkill?: (skill: SkillManifest) => void;
   onSelectWorkflow?: (workflow: WorkflowManifest) => void;
+  onCentralizeSkill?: (skill: SkillManifest) => Promise<void> | void;
+  onRevertSkill?: (skill: SkillManifest) => Promise<void> | void;
+  onCentralizeWorkflow?: (workflow: WorkflowManifest) => Promise<void> | void;
+  onRevertWorkflow?: (workflow: WorkflowManifest) => Promise<void> | void;
+  onBatchCentralize?: (skillIds: string[]) => Promise<void> | void;
+  onBatchRevert?: (skillIds: string[]) => Promise<void> | void;
 }
 
 export const DiscoveryTable: React.FC<DiscoveryTableProps> = ({
   skills,
   workflows,
   onSelectSkill,
-  onSelectWorkflow
+  onSelectWorkflow,
+  onCentralizeSkill,
+  onRevertSkill,
+  onCentralizeWorkflow,
+  onRevertWorkflow,
+  onBatchCentralize,
+  onBatchRevert,
 }) => {
   const [query, setQuery] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    action: 'centralize' | 'revert';
+    items: ConfirmModalItem[];
+  } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isWorkflowMode = Boolean(workflows);
 
@@ -44,18 +67,94 @@ export const DiscoveryTable: React.FC<DiscoveryTableProps> = ({
     );
   }, [workflows, query]);
 
+  const allVisibleSelected =
+    !isWorkflowMode &&
+    filteredSkills.length > 0 &&
+    filteredSkills.every((s) => selectedIds.has(s.id));
+
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredSkills.map((s) => s.id)));
+    }
+  };
+
+  const toggleRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const openSingleAction = (item: SkillManifest | WorkflowManifest, action: 'centralize' | 'revert') => {
+    setModalConfig({
+      isOpen: true,
+      action,
+      items: [{
+        skillId: item.id,
+        skillName: item.name,
+        sourcePath: item.sourcePath,
+        targetCentralPath: item.targetPath,
+      }],
+    });
+  };
+
+  const openBatchAction = (action: 'centralize' | 'revert') => {
+    const selectedSkills = (skills || []).filter((s) => selectedIds.has(s.id));
+    setModalConfig({
+      isOpen: true,
+      action,
+      items: selectedSkills.map((s) => ({
+        skillId: s.id,
+        skillName: s.name,
+        sourcePath: s.sourcePath,
+        targetCentralPath: s.targetPath,
+      })),
+    });
+  };
+
+  const handleConfirmModal = async () => {
+    if (!modalConfig) return;
+    setIsSubmitting(true);
+    try {
+      if (modalConfig.items.length === 1 && modalConfig.items[0]) {
+        const item = modalConfig.items[0];
+        if (isWorkflowMode) {
+          const wf = (workflows || []).find((w) => w.id === item.skillId);
+          if (wf) {
+            if (modalConfig.action === 'centralize') await onCentralizeWorkflow?.(wf);
+            else await onRevertWorkflow?.(wf);
+          }
+        } else {
+          const skill = (skills || []).find((s) => s.id === item.skillId);
+          if (skill) {
+            if (modalConfig.action === 'centralize') await onCentralizeSkill?.(skill);
+            else await onRevertSkill?.(skill);
+          }
+        }
+      } else {
+        const ids = modalConfig.items.map((i) => i.skillId);
+        if (modalConfig.action === 'centralize') await onBatchCentralize?.(ids);
+        else await onBatchRevert?.(ids);
+        setSelectedIds(new Set());
+      }
+      setModalConfig(null);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const itemsCount = isWorkflowMode ? (workflows?.length ?? 0) : (skills?.length ?? 0);
   const filteredCount = isWorkflowMode ? filteredWorkflows.length : filteredSkills.length;
   const placeholderText = isWorkflowMode
     ? 'Filter workflows by command, ecosystem, or path...'
     : 'Filter skills by name, ecosystem, or path...';
-  const tableTitle = isWorkflowMode
-    ? 'Discovered Workflows & Slash Commands'
-    : 'Registered Skills Inventory';
 
   return (
     <div>
-      {/* Search & Filter Bar */}
       <div style={{ marginBottom: '16px', display: 'flex', gap: '12px' }}>
         <input
           type="text"
@@ -71,15 +170,41 @@ export const DiscoveryTable: React.FC<DiscoveryTableProps> = ({
             borderRadius: 'var(--border-radius-small)',
             border: '1px solid var(--color-border-default)',
             backgroundColor: 'var(--color-canvas-default)',
-            color: 'var(--color-fg-default)'
+            color: 'var(--color-fg-default)',
           }}
         />
       </div>
 
-      {/* Primer Box Table */}
+      {!isWorkflowMode && (
+        <BatchActionBar
+          selectedCount={selectedIds.size}
+          onCentralizeSelected={() => openBatchAction('centralize')}
+          onRevertSelected={() => openBatchAction('revert')}
+          onClearSelection={() => setSelectedIds(new Set())}
+          disabled={isSubmitting}
+        />
+      )}
+
       <div className="Box">
-        <div className="Box-header">
-          <span className="Box-title">{tableTitle}</span>
+        <div
+          className="Box-header"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {!isWorkflowMode && filteredSkills.length > 0 && (
+              <input
+                type="checkbox"
+                aria-label="Select all skills"
+                checked={allVisibleSelected}
+                onChange={toggleSelectAll}
+                className="form-checkbox"
+                style={{ cursor: 'pointer' }}
+              />
+            )}
+            <span className="Box-title">
+              {isWorkflowMode ? 'Discovered Workflows' : 'Registered Skills Inventory'}
+            </span>
+          </div>
           <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
             Showing {filteredCount} of {itemsCount}
           </span>
@@ -90,110 +215,34 @@ export const DiscoveryTable: React.FC<DiscoveryTableProps> = ({
             No matching items found.
           </div>
         ) : isWorkflowMode ? (
-          filteredWorkflows.map((workflow) => {
-            const isGemini = workflow.targetEcosystem === 'gemini';
-            const badgeClass = isGemini ? 'Label Label--accent' : 'Label Label--done';
-
-            return (
-              <div key={workflow.id} className="Box-row" style={{ cursor: 'pointer' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <button
-                      type="button"
-                      onClick={() => onSelectWorkflow?.(workflow)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        font: 'inherit',
-                        fontWeight: 600,
-                        color: 'var(--color-accent-fg)',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <code style={{ fontSize: '14px', fontWeight: 600 }}>{workflow.command}</code>
-                    </button>
-                    <span className={badgeClass}>{workflow.targetEcosystem}</span>
-                    <span className="Label Label--secondary">{workflow.scope}</span>
-                    {workflow.metadata?.argumentHint && (
-                      <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)', fontFamily: 'monospace' }}>
-                        {workflow.metadata.argumentHint}
-                      </span>
-                    )}
-                  </div>
-
-                  {workflow.description && (
-                    <div style={{ fontSize: '12px', color: 'var(--color-fg-muted)', marginBottom: '4px' }}>
-                      {workflow.description}
-                    </div>
-                  )}
-
-                  <div
-                    style={{
-                      fontFamily: 'monospace',
-                      fontSize: '11px',
-                      color: 'var(--color-fg-muted)',
-                      wordBreak: 'break-all'
-                    }}
-                  >
-                    {workflow.sourcePath}
-                  </div>
-                </div>
-              </div>
-            );
-          })
+          <WorkflowTableRows
+            workflows={filteredWorkflows}
+            onSelectWorkflow={onSelectWorkflow}
+            onCentralizeWorkflow={(wf) => openSingleAction(wf, 'centralize')}
+            onRevertWorkflow={(wf) => openSingleAction(wf, 'revert')}
+          />
         ) : (
-          filteredSkills.map((skill) => {
-            const isGemini = skill.targetEcosystem === 'gemini';
-            const badgeClass = isGemini ? 'Label Label--accent' : 'Label Label--done';
-
-            return (
-              <div key={skill.id} className="Box-row" style={{ cursor: 'pointer' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <button
-                      type="button"
-                      onClick={() => onSelectSkill?.(skill)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        font: 'inherit',
-                        fontWeight: 600,
-                        color: 'var(--color-accent-fg)',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      {skill.name}
-                    </button>
-                    <span className={badgeClass}>{skill.targetEcosystem}</span>
-                    <span className="Label Label--success">{skill.status}</span>
-                  </div>
-
-                  {skill.description && (
-                    <div style={{ fontSize: '12px', color: 'var(--color-fg-muted)', marginBottom: '4px' }}>
-                      {skill.description}
-                    </div>
-                  )}
-
-                  <div
-                    style={{
-                      fontFamily: 'monospace',
-                      fontSize: '11px',
-                      color: 'var(--color-fg-muted)',
-                      wordBreak: 'break-all'
-                    }}
-                  >
-                    {skill.sourcePath}
-                  </div>
-                </div>
-              </div>
-            );
-          })
+          <SkillTableRows
+            skills={filteredSkills}
+            selectedIds={selectedIds}
+            toggleRow={toggleRow}
+            onSelectSkill={onSelectSkill}
+            openSingleAction={openSingleAction}
+            isSubmitting={isSubmitting}
+          />
         )}
       </div>
+
+      {modalConfig && (
+        <CentralizeConfirmModal
+          isOpen={modalConfig.isOpen}
+          action={modalConfig.action}
+          items={modalConfig.items}
+          onConfirm={handleConfirmModal}
+          onCancel={() => setModalConfig(null)}
+          isSubmitting={isSubmitting}
+        />
+      )}
     </div>
   );
 };

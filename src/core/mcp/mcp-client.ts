@@ -1,12 +1,107 @@
-import { spawn } from 'node:child_process';
-import { McpToolDefinition } from '../types.js';
-import { defaultLogger } from '../logger.js';
+import { McpServerInfo, McpToolDefinition } from '../types.js';
+import { runMcpStdioSession, McpProcessOptions } from './stdio-runner.js';
 
-export interface QueryMcpToolsOptions {
-  command: string;
-  args?: string[];
-  env?: Record<string, string>;
-  timeoutMs?: number;
+export interface QueryMcpToolsOptions extends McpProcessOptions {}
+
+export interface McpDiscoveryResult {
+  title?: string;
+  version?: string;
+  description?: string;
+  instructions?: string;
+  serverInfo?: McpServerInfo;
+  tools: McpToolDefinition[];
+}
+
+function mapTools(rawTools: unknown): McpToolDefinition[] {
+  if (!Array.isArray(rawTools)) return [];
+  return rawTools.map((t: any) => ({
+    name: String(t.name || ''),
+    description: t.description ? String(t.description) : undefined,
+    parameters: t.inputSchema || t.parameters,
+  }));
+}
+
+/**
+ * Probes an MCP server using stateless server/discover, falling back to initialize + tools/list.
+ */
+export async function discoverMcpServer(
+  options: QueryMcpToolsOptions
+): Promise<McpDiscoveryResult> {
+  let serverInfo: McpServerInfo | undefined;
+  let instructions: string | undefined;
+
+  return runMcpStdioSession<McpDiscoveryResult>(
+    options,
+    (send) => {
+      send({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'server/discover',
+        params: {},
+      });
+    },
+    (msg, send, finish) => {
+      if (!msg || typeof msg !== 'object') return;
+
+      if (msg.id === 1) {
+        if (msg.error || !msg.result) {
+          // Fallback to legacy initialize handshake
+          send({
+            jsonrpc: '2.0',
+            id: 2,
+            method: 'initialize',
+            params: {
+              protocolVersion: '2024-11-05',
+              capabilities: {},
+              clientInfo: { name: 'koskill', version: '0.1.0' },
+            },
+          });
+          return;
+        }
+
+        const res = msg.result;
+        const sInfo: McpServerInfo | undefined =
+          res.serverInfo || res._meta?.['io.modelcontextprotocol/serverInfo'];
+        finish(null, {
+          title: sInfo?.title || res.title,
+          version: sInfo?.version || res.version,
+          description: sInfo?.description || res.description,
+          instructions: res.instructions || sInfo?.description,
+          serverInfo: sInfo,
+          tools: mapTools(res.tools),
+        });
+        return;
+      }
+
+      if (msg.id === 2) {
+        if (msg.error) {
+          finish(new Error(`MCP server initialize failed: ${msg.error.message || JSON.stringify(msg.error)}`));
+          return;
+        }
+        serverInfo = msg.result?.serverInfo;
+        instructions = msg.result?.instructions;
+
+        send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+        send({ jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} });
+        return;
+      }
+
+      if (msg.id === 3) {
+        if (msg.error) {
+          finish(new Error(`tools/list returned error: ${msg.error.message || JSON.stringify(msg.error)}`));
+          return;
+        }
+        finish(null, {
+          title: serverInfo?.title,
+          version: serverInfo?.version,
+          description: serverInfo?.description,
+          instructions,
+          serverInfo,
+          tools: mapTools(msg.result?.tools),
+        });
+      }
+    }
+  );
 }
 
 /**
@@ -16,162 +111,36 @@ export interface QueryMcpToolsOptions {
 export async function queryMcpServerTools(
   options: QueryMcpToolsOptions
 ): Promise<McpToolDefinition[]> {
-  const { command, args = [], env, timeoutMs = 6000 } = options;
-
-  if (!command) {
-    throw new Error('MCP server command is empty');
-  }
-
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    let stdoutBuffer = '';
-
-    const spawnEnv = {
-      ...process.env,
-      ...env,
-    };
-
-    let proc: ReturnType<typeof spawn>;
-    try {
-      proc = spawn(command, args, {
-        env: spawnEnv,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-    } catch (err: any) {
-      return reject(new Error(`Failed to spawn MCP server '${command}': ${err.message}`));
-    }
-
-    const cleanup = () => {
-      clearTimeout(timer);
-      if (proc && !proc.killed) {
-        try {
-          proc.kill('SIGTERM');
-          setTimeout(() => {
-            if (!proc.killed) proc.kill('SIGKILL');
-          }, 500).unref();
-        } catch {
-          // ignore kill failure
-        }
-      }
-    };
-
-    const finish = (err: Error | null, tools?: McpToolDefinition[]) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      if (err) {
-        reject(err);
-      } else {
-        resolve(tools || []);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      finish(new Error(`MCP server query timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    proc.on('error', (err) => {
-      finish(new Error(`MCP server process error: ${err.message}`));
-    });
-
-    proc.stderr?.on('data', (chunk) => {
-      defaultLogger.debug('MCP server stderr', { stderr: chunk.toString() });
-    });
-
-    const sendJsonRpc = (payload: Record<string, unknown>) => {
-      if (!proc.stdin || proc.stdin.destroyed) return;
-      const json = JSON.stringify(payload);
-      proc.stdin.write(`${json}\n`);
-    };
-
-    // Step 1: Start handshake with initialize request
-    sendJsonRpc({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: {
-        protocolVersion: '2024-11-05',
-        capabilities: {},
-        clientInfo: {
-          name: 'koskill',
-          version: '0.1.0',
+  return runMcpStdioSession<McpToolDefinition[]>(
+    options,
+    (send) => {
+      send({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2024-11-05',
+          capabilities: {},
+          clientInfo: { name: 'koskill', version: '0.1.0' },
         },
-      },
-    });
-
-    const handleMessage = (msg: any) => {
+      });
+    },
+    (msg, send, finish) => {
       if (!msg || typeof msg !== 'object') return;
 
-      // Handle initialize response
       if (msg.id === 1 && msg.result) {
-        // Send initialized notification
-        sendJsonRpc({
-          jsonrpc: '2.0',
-          method: 'notifications/initialized',
-        });
-
-        // Step 2: Request tool listing
-        sendJsonRpc({
-          jsonrpc: '2.0',
-          id: 2,
-          method: 'tools/list',
-          params: {},
-        });
+        send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+        send({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
         return;
       }
 
-      // Handle tools/list response
       if (msg.id === 2) {
         if (msg.error) {
           finish(new Error(`tools/list returned error: ${msg.error.message || JSON.stringify(msg.error)}`));
           return;
         }
-
-        const rawTools = msg.result?.tools;
-        if (!Array.isArray(rawTools)) {
-          finish(null, []);
-          return;
-        }
-
-        const tools: McpToolDefinition[] = rawTools.map((t: any) => ({
-          name: String(t.name || ''),
-          description: t.description ? String(t.description) : undefined,
-          parameters: t.inputSchema || t.parameters,
-        }));
-
-        finish(null, tools);
+        finish(null, mapTools(msg.result?.tools));
       }
-    };
-
-    proc.stdout?.on('data', (chunk: Buffer) => {
-      stdoutBuffer += chunk.toString('utf-8');
-
-      // Process newline-delimited or headers+json messages
-      let newlineIdx: number;
-      while ((newlineIdx = stdoutBuffer.indexOf('\n')) !== -1) {
-        const line = stdoutBuffer.slice(0, newlineIdx).trim();
-        stdoutBuffer = stdoutBuffer.slice(newlineIdx + 1);
-
-        if (!line) continue;
-
-        // Strip Content-Length header lines if present
-        if (line.startsWith('Content-Length:') || line.startsWith('content-length:')) {
-          continue;
-        }
-
-        try {
-          const parsed = JSON.parse(line);
-          handleMessage(parsed);
-        } catch {
-          // May be partial or non-json log line; ignore and continue
-        }
-      }
-    });
-
-    proc.on('close', (code) => {
-      if (!settled) {
-        finish(new Error(`MCP server process exited prematurely with code ${code}`));
-      }
-    });
-  });
+    }
+  );
 }

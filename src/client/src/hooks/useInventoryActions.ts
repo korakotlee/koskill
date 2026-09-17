@@ -233,6 +233,49 @@ export function useInventoryActions(
     }
   };
 
+  const handleDiscoverMcp = async (server: McpServerManifest) => {
+    try {
+      const res = await fetch(`/api/mcp/${encodeURIComponent(server.name)}/discover`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to discover MCP server metadata');
+      setFlash({
+        message: `Discovered metadata for ${data.server?.title || server.name}.`,
+        type: 'success',
+      });
+      if (data.server) {
+        options?.setSelectedMcp?.((prev) =>
+          prev && (prev.id === server.id || prev.name === server.name)
+            ? { ...prev, ...data.server }
+            : prev
+        );
+      }
+      await fetchInventory();
+      return data.server;
+    } catch (err: any) {
+      setFlash({ message: `MCP Discovery failed: ${err.message}`, type: 'danger' });
+      throw err;
+    }
+  };
+
+  const handleDiscoverAllMcp = async () => {
+    try {
+      const res = await fetch('/api/mcp/discover-all', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to discover all MCP servers');
+      setFlash({
+        message: `Discovered metadata for ${data.total || 0} MCP servers.`,
+        type: 'success',
+      });
+      await fetchInventory();
+      return data.results || [];
+    } catch (err: any) {
+      setFlash({ message: `Batch discovery failed: ${err.message}`, type: 'danger' });
+      throw err;
+    }
+  };
+
   return {
     flash,
     setFlash,
@@ -246,5 +289,7 @@ export function useInventoryActions(
     handleToggleMcp,
     handleGenerateMcpSubset,
     handleQueryMcpTools,
+    handleDiscoverMcp,
+    handleDiscoverAllMcp,
   };
 }

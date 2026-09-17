@@ -52,15 +52,36 @@ export const McpConfigSidebar: React.FC<McpConfigSidebarProps> = ({ server }) =>
           </div>
         )}
 
+        {server.version && (
+          <div className="Box-row">
+            <span style={{ fontSize: '13px', color: 'var(--color-fg-muted)' }}>Version</span>
+            <span style={{ fontWeight: 600 }}>{server.version}</span>
+          </div>
+        )}
+
         <div className="Box-row">
           <span style={{ fontSize: '13px', color: 'var(--color-fg-muted)' }}>Transport Protocol</span>
           <span style={{ fontWeight: 600 }}>{server.transport}</span>
         </div>
 
         <div className="Box-row">
+          <span style={{ fontSize: '13px', color: 'var(--color-fg-muted)' }}>Protocol Support</span>
+          <span style={{ fontWeight: 600 }}>server/discover, initialize</span>
+        </div>
+
+        <div className="Box-row">
           <span style={{ fontSize: '13px', color: 'var(--color-fg-muted)' }}>Declared Tools</span>
           <span style={{ fontWeight: 600 }}>{server.declaredToolsCount}</span>
         </div>
+
+        {server.lastDiscoveredAt && (
+          <div className="Box-row">
+            <span style={{ fontSize: '13px', color: 'var(--color-fg-muted)' }}>Last Discovered</span>
+            <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
+              {new Date(server.lastDiscoveredAt).toLocaleDateString()}
+            </span>
+          </div>
+        )}
 
         <div className="Box-row">
           <span style={{ fontSize: '13px', color: 'var(--color-fg-muted)' }}>Registry Status</span>

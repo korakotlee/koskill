@@ -112,6 +112,8 @@ The Node.js HTTP server binds strictly to `127.0.0.1:3900`:
 - `POST /api/mcp/:name/centralize`: Registers an MCP server into `~/.koskill/mcp/servers.json`.
 - `POST /api/mcp/:name/toggle`: Toggles the enabled state of an MCP server (`{ enabled: boolean }`).
 - `POST /api/mcp/:name/query-tools`: Connects to an MCP server process over stdio via JSON-RPC 2.0 (`initialize` + `tools/list`), discovers available tools, updates `declaredToolsCount`, and caches them in `~/.koskill/mcp/servers.json`.
+- `POST /api/mcp/:name/discover`: Proactively probes an MCP server over stdio using `server/discover` (with fallback to `initialize` and local `instructions.md`), extracting title, version, description, instructions, and tools.
+- `POST /api/mcp/discover-all`: Probes all active MCP servers in batch with concurrency pooling, persisting enriched metadata in the central registry.
 - `POST /api/mcp/generate-subset`: Generates `agents_mcp/servers.json` containing only enabled MCP servers.
 - `GET /api/search/query`: Executes hybrid vector + lexical search queries (`?q=<query>&limit=<n>&itemType=<type>&ecosystem=<eco>`) returning RRF-ranked results.
 - `POST /api/search/reindex`: Triggers incremental re-indexing of all discovered skills and workflows into `~/.koskill/cache/index.db`.
@@ -122,11 +124,12 @@ The Node.js HTTP server binds strictly to `127.0.0.1:3900`:
 
 The core system manages the `~/.koskill/` hierarchy and active runtime communication:
 
-- **MCP Query Client (`mcp-client.ts`)**: Spawns local MCP server commands over stdio, conducts JSON-RPC 2.0 protocol handshakes (`initialize`, `notifications/initialized`, `tools/list`), and parses tools with a configurable safety timeout.
+- **MCP Client & Stdio Runner (`mcp-client.ts`, `stdio-runner.ts`)**: Spawns local MCP server commands over stdio, conducts JSON-RPC 2.0 protocol discovery (`server/discover`) with legacy handshake fallback (`initialize`, `notifications/initialized`, `tools/list`), and enforces strict process timeouts and kill sequences.
+- **MCP Discovery Service (`mcp-discovery-service.ts`)**: Orchestrates single-server and batch discovery tasks with in-flight deduplication and worker pooling.
 - **Store Coordinator (`store.ts`)**: Idempotently initializes `~/.koskill/skills/`, `~/.koskill/workflows/`, and `~/.koskill/mcp/` directories with safe permissions.
 - **Skill Symlink Manager (`symlink-manager.ts`)**: Executes two-phase copy, backup, atomic symlink generation, and reversible rollback routines for directory-based skill migrations.
 - **Workflow Symlink Manager (`workflow-symlink-manager.ts`)**: Executes atomic migration and symlinking for standalone workflow `.md` files.
-- **MCP Registry Store (`mcp-store.ts`)**: Maintains canonical server declarations in `~/.koskill/mcp/servers.json`, supports server activation toggling, tool schema caching (`updateServerTools`), and exports subsets into `agents_mcp/servers.json`.
+- **MCP Registry Store (`mcp-store.ts`)**: Maintains canonical server declarations in `~/.koskill/mcp/servers.json`, supports server activation toggling, metadata updates (`updateServerDiscoveryMetadata`), tool schema caching, local `instructions.md` loading, and exports subsets into `agents_mcp/servers.json`.
 - **Transaction Journal (`journal.ts`)**: Appends atomic transaction records to `~/.koskill/journal.json` with status tracking (`COMPLETED`, `FAILED`, `ROLLED_BACK`).
 
 ---
@@ -153,8 +156,8 @@ The React client adopts the GitHub Primer design system:
 - **Discovery Table (`DiscoveryTable.tsx`)**: Instant client-side filtering across skill and workflow names, commands, ecosystems, and paths, with badge indicators and multi-select centralization toolbars.
 - **Skill Detail View (`SkillDetailView.tsx`)**: Dedicated inspection view featuring `← Back to Discovery` breadcrumb navigation, two-column responsive layout, and metadata summary card with bold frontmatter formatting.
 - **Workflow Detail View (`WorkflowDetailView.tsx`)**: Dedicated inspection view featuring invocation syntax display, argument hints, tool permission badges, Centralize/Revert action triggers, and raw prompt instruction panel.
-- **MCP Server List (`McpServerList.tsx`)**: Inventory of configured MCP servers with status badges, activation toggle buttons, and an action bar to generate `agents_mcp/servers.json`.
-- **MCP Detail View (`McpDetailView.tsx`)**: Dedicated inspection view featuring tool capability tables (bold tool names, normal descriptions), runtime command/args, transport type, and environment configuration. Automatically queries active MCP servers with 0 cached tools and offers manual "Refresh Tools" triggers.
+- **MCP Server List (`McpServerList.tsx`)**: Inventory of configured MCP servers with titles, version badges, description snippets, quick "Discover" actions with spinner states, activation toggle buttons, and an action bar to generate `agents_mcp/servers.json`.
+- **MCP Detail View (`McpDetailView.tsx`)**: Dedicated inspection view featuring Server Overview card, Agent Instructions markdown viewer, tool capability tables (`McpToolsTable.tsx`), runtime command/args, transport type, and interactive "Discover Server" action.
 - **Markdown Viewer (`MarkdownViewer.tsx`)**: Primer README-style container rendering `SKILL.md` and workflow markdown via `marked`, featuring clean frontmatter extraction and bold key/normal text styling.
 
 

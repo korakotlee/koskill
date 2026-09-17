@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { McpServerManifest } from '../../../core/types.js';
 import { StorageStatusBadge } from './StorageStatusBadge.js';
 import { McpConfigSidebar } from './McpConfigSidebar.js';
+import { McpToolsTable } from './McpToolsTable.js';
+import { MarkdownViewer } from './MarkdownViewer.js';
 
 export interface McpDetailViewProps {
   server: McpServerManifest;
@@ -9,10 +11,11 @@ export interface McpDetailViewProps {
   onToggleEnabled?: (server: McpServerManifest, enabled: boolean) => Promise<void> | void;
   onCentralize?: (server: McpServerManifest) => Promise<void> | void;
   onQueryTools?: (server: McpServerManifest) => Promise<any> | void;
+  onDiscoverServer?: (server: McpServerManifest) => Promise<any> | void;
 }
 
 /**
- * Detailed view for an MCP Server, displaying configuration metadata and available tools.
+ * Detailed view for an MCP Server, displaying overview, instructions, metadata, and tools.
  */
 export const McpDetailView: React.FC<McpDetailViewProps> = ({
   server,
@@ -20,14 +23,17 @@ export const McpDetailView: React.FC<McpDetailViewProps> = ({
   onToggleEnabled,
   onCentralize,
   onQueryTools,
+  onDiscoverServer,
 }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isQueryingTools, setIsQueryingTools] = useState(false);
+  const [isDiscovering, setIsDiscovering] = useState(false);
   const [queryError, setQueryError] = useState<string | null>(null);
 
   const isEnabled = server.enabled !== false;
   const isCentralized = server.status === 'centralized';
   const tools = server.tools || [];
+  const displayName = server.title || server.name;
 
   // Auto-query tools if none are cached, server is active, and command is configured
   useEffect(() => {
@@ -81,10 +87,23 @@ export const McpDetailView: React.FC<McpDetailViewProps> = ({
     }
   };
 
+  const handleDiscover = async () => {
+    if (!onDiscoverServer) return;
+    setIsDiscovering(true);
+    setQueryError(null);
+    try {
+      await onDiscoverServer(server);
+    } catch (err: any) {
+      setQueryError(err.message || 'Failed to discover MCP server metadata');
+    } finally {
+      setIsDiscovering(false);
+    }
+  };
+
   return (
     <div>
       {/* Breadcrumb Navigation & Top Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
         <button
           type="button"
           onClick={onBack}
@@ -100,7 +119,24 @@ export const McpDetailView: React.FC<McpDetailViewProps> = ({
           &larr; Back to MCP Servers
         </button>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {onDiscoverServer && server.command && (
+            <button
+              type="button"
+              className="Btn"
+              onClick={handleDiscover}
+              disabled={isDiscovering}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontWeight: 600,
+              }}
+            >
+              {isDiscovering ? 'Discovering...' : 'Discover Server'}
+            </button>
+          )}
+
           {onQueryTools && server.command && (
             <button
               type="button"
@@ -155,10 +191,20 @@ export const McpDetailView: React.FC<McpDetailViewProps> = ({
       </div>
 
       {/* Header Info */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
         <h2 style={{ fontSize: '24px', fontWeight: 600, margin: 0 }}>
-          {server.name}
+          {displayName}
         </h2>
+        {server.title && server.title !== server.name && (
+          <span style={{ fontSize: '14px', color: 'var(--color-fg-muted)' }}>
+            ({server.name})
+          </span>
+        )}
+        {server.version && (
+          <span className="Label Label--secondary" style={{ fontSize: '12px' }}>
+            v{server.version}
+          </span>
+        )}
         <span className="Label Label--accent">{server.transport}</span>
         <StorageStatusBadge status={server.status || 'original'} />
         <span
@@ -172,81 +218,48 @@ export const McpDetailView: React.FC<McpDetailViewProps> = ({
         </span>
       </div>
 
-      <p style={{ color: 'var(--color-fg-muted)', marginBottom: '24px', fontSize: '15px' }}>
-        Configured MCP server daemon exposing {server.declaredToolsCount} automated tool capabilities.
-      </p>
-
       {/* Two-Column Responsive Layout */}
       <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        {/* Main Tools Panel (65%) */}
+        {/* Left Column (65%) */}
         <div style={{ flex: '1 1 600px', minWidth: '320px' }}>
-          <div className="Box">
-            <div className="Box-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="Box-title">Tools & Capabilities</span>
-              <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
-                {tools.length} declared tools
-              </span>
+          {/* Server Overview Card */}
+          <div className="Box" style={{ marginBottom: '20px' }}>
+            <div className="Box-header">
+              <span className="Box-title">Server Overview</span>
             </div>
-
-            {queryError && (
-              <div
-                style={{
-                  margin: '12px 16px',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  backgroundColor: 'rgba(218, 54, 51, 0.1)',
-                  color: 'var(--color-danger-fg)',
-                  fontSize: '13px',
-                }}
-              >
-                <strong>Query Warning:</strong> {queryError}
-              </div>
-            )}
-
-            {isQueryingTools ? (
-              <div style={{ padding: '32px', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
-                Connecting to MCP server process and querying tool list...
-              </div>
-            ) : tools.length > 0 ? (
-              <div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', margin: 0 }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--color-border-muted)', backgroundColor: 'var(--color-canvas-subtle)' }}>
-                      <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, width: '220px' }}>Tool Name</th>
-                      <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>Description</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tools.map((tool, idx) => (
-                      <tr
-                        key={tool.name + idx}
-                        style={{
-                          borderBottom: idx < tools.length - 1 ? '1px solid var(--color-border-muted)' : 'none',
-                        }}
-                      >
-                        <td style={{ padding: '10px 16px', verticalAlign: 'top' }}>
-                          <span style={{ fontWeight: 700, color: 'var(--color-fg-default)' }}>
-                            {tool.name}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px 16px', verticalAlign: 'top', color: 'var(--color-fg-default)', fontWeight: 400 }}>
-                          {tool.description || (
-                            <span style={{ color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>
-                              No description provided
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div style={{ padding: '24px', color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>
-                No tool declarations found for this server. Click "Refresh Tools" above to query the running server process.
-              </div>
-            )}
+            <div className="Box-body" style={{ padding: '16px', lineHeight: 1.6, fontSize: '14px' }}>
+              {server.description ? (
+                <p style={{ margin: 0, color: 'var(--color-fg-default)' }}>{server.description}</p>
+              ) : (
+                <p style={{ margin: 0, color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>
+                  No description discovered yet. Click "Discover Server" to probe server metadata.
+                </p>
+              )}
+            </div>
           </div>
+
+          {/* Agent Instructions Card */}
+          <div className="Box" style={{ marginBottom: '20px' }}>
+            <div className="Box-header">
+              <span className="Box-title">Agent Instructions</span>
+            </div>
+            <div className="Box-body" style={{ padding: '16px' }}>
+              {server.instructions ? (
+                <MarkdownViewer content={server.instructions} />
+              ) : (
+                <p style={{ margin: 0, color: 'var(--color-fg-muted)', fontStyle: 'italic', fontSize: '13px' }}>
+                  No prompt instructions reported by this server. Instructions provide agents with tool-calling conventions and guidelines.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Tools & Capabilities Table */}
+          <McpToolsTable
+            tools={tools}
+            isQuerying={isQueryingTools}
+            queryError={queryError}
+          />
         </div>
 
         {/* Metadata Sidebar (35%) */}

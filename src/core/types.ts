@@ -38,11 +38,26 @@ export interface McpToolDefinition {
 }
 
 /**
+ * Information describing an MCP server returned by discovery or handshakes.
+ */
+export interface McpServerInfo {
+  name: string;
+  title?: string;
+  version?: string;
+  description?: string;
+}
+
+/**
  * Configuration declaration for an MCP server instance.
  */
 export interface McpServerManifest {
   id: string;
   name: string;
+  title?: string;
+  version?: string;
+  description?: string;
+  instructions?: string;
+  serverInfo?: McpServerInfo;
   transport: McpTransport;
   command: string;
   args: string[];
@@ -52,6 +67,7 @@ export interface McpServerManifest {
   enabled?: boolean;
   status?: SkillStatus;
   sourceConfigPath?: string;
+  lastDiscoveredAt?: string;
 }
 
 /**

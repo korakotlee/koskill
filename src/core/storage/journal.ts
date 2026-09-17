@@ -7,7 +7,7 @@ import { defaultLogger } from '../logger.js';
 /**
  * Supported storage transaction mutation actions.
  */
-export type JournalAction = 'CENTRALIZE' | 'REVERT';
+export type JournalAction = 'CENTRALIZE' | 'REVERT' | 'TOGGLE' | 'BACKUP_EXPORT' | 'BACKUP_IMPORT';
 
 /**
  * Status states for a storage transaction.
@@ -21,13 +21,16 @@ export interface JournalEntry {
   id: string;
   timestamp: string;
   action: JournalAction;
-  skillId: string;
-  skillName: string;
-  originalPath: string;
-  centralPath: string;
-  symlinkPath: string;
+  skillId?: string;
+  skillName?: string;
+  originalPath?: string;
+  centralPath?: string;
+  symlinkPath?: string;
+  entityType?: string;
+  entityId?: string;
   status: JournalStatus;
   error?: string;
+  metadata?: Record<string, unknown>;
 }
 
 /**

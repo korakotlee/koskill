@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { McpServerManifest, McpToolDefinition } from '../types.js';
+import { McpServerInfo, McpServerManifest, McpToolDefinition } from '../types.js';
 import { getKoskillMcpDir, initCentralStore } from './store.js';
 import { defaultLogger } from '../logger.js';
 
@@ -205,5 +205,92 @@ export async function updateServerTools(
 
   defaultLogger.info('Updated MCP server tools in registry', { name: server.name, toolsCount: tools.length });
   return server;
+}
+
+/**
+ * Loads instructions.md for a given server from standard configuration directories.
+ */
+export async function loadServerInstructions(
+  serverName: string,
+  searchDirs?: string[]
+): Promise<string | undefined> {
+  const baseDirs = searchDirs || [
+    path.join(os.homedir(), '.gemini', 'antigravity-ide', 'mcp'),
+    path.join(os.homedir(), '.claude', 'mcp'),
+  ];
+
+  for (const base of baseDirs) {
+    try {
+      const candidates = base.endsWith(serverName)
+        ? [path.join(base, 'instructions.md')]
+        : [path.join(base, serverName, 'instructions.md'), path.join(base, 'instructions.md')];
+
+      for (const instrPath of candidates) {
+        try {
+          const content = await fs.readFile(instrPath, 'utf-8');
+          if (content && content.trim().length > 0) {
+            return content.trim();
+          }
+        } catch {
+          // File does not exist at this candidate path
+        }
+      }
+    } catch {
+      // Continue to next directory
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Updates an MCP server with newly discovered metadata in the registry.
+ */
+export async function updateServerDiscoveryMetadata(
+  serverName: string,
+  discovery: {
+    title?: string;
+    version?: string;
+    description?: string;
+    instructions?: string;
+    serverInfo?: McpServerInfo;
+    tools?: McpToolDefinition[];
+  },
+  customHome?: string
+): Promise<McpServerManifest> {
+  const registry = await loadMcpRegistry(customHome);
+  const server = registry[serverName] || Object.values(registry).find((s) => s.id === serverName || s.name === serverName);
+
+  if (!server) {
+    throw new Error(`MCP server not found in central registry: ${serverName}`);
+  }
+
+  let instructions = discovery.instructions || server.instructions;
+  if (!instructions) {
+    instructions = await loadServerInstructions(server.name);
+  }
+
+  const updated: McpServerManifest = {
+    ...server,
+    title: discovery.title ?? server.title,
+    version: discovery.version ?? server.version,
+    description: discovery.description ?? server.description,
+    instructions,
+    serverInfo: discovery.serverInfo ?? server.serverInfo,
+    tools: discovery.tools && discovery.tools.length > 0 ? discovery.tools : server.tools,
+    declaredToolsCount: discovery.tools && discovery.tools.length > 0 ? discovery.tools.length : server.declaredToolsCount,
+    lastDiscoveredAt: new Date().toISOString(),
+  };
+
+  registry[server.name] = updated;
+  await saveMcpRegistry(registry, customHome);
+
+  defaultLogger.info('Updated MCP server discovery metadata in registry', {
+    name: server.name,
+    title: updated.title,
+    version: updated.version,
+    toolsCount: updated.declaredToolsCount,
+  });
+
+  return updated;
 }
 

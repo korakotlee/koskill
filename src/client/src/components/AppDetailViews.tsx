@@ -13,6 +13,8 @@ export interface AppDetailViewsProps {
   onRevertSkill: (skill: SkillManifest) => void;
   onCentralizeWorkflow: (workflow: WorkflowManifest) => void;
   onRevertWorkflow: (workflow: WorkflowManifest) => void;
+  onToggleSkill?: (skill: SkillManifest, enabled: boolean) => void;
+  onToggleWorkflow?: (workflow: WorkflowManifest, enabled: boolean) => void;
   onToggleMcp: (server: McpServerManifest, enabled: boolean) => void;
   onCentralizeMcp: (server: McpServerManifest) => void;
   onQueryTools: (server: McpServerManifest) => void;
@@ -31,6 +33,8 @@ export const AppDetailViews: React.FC<AppDetailViewsProps> = ({
   onRevertSkill,
   onCentralizeWorkflow,
   onRevertWorkflow,
+  onToggleSkill,
+  onToggleWorkflow,
   onToggleMcp,
   onCentralizeMcp,
   onQueryTools,
@@ -43,6 +47,7 @@ export const AppDetailViews: React.FC<AppDetailViewsProps> = ({
         onBack={onClearSelection}
         onCentralizeSkill={onCentralizeSkill}
         onRevertSkill={onRevertSkill}
+        onToggleSkill={onToggleSkill}
       />
     );
   }
@@ -54,6 +59,7 @@ export const AppDetailViews: React.FC<AppDetailViewsProps> = ({
         onBack={onClearSelection}
         onCentralizeWorkflow={onCentralizeWorkflow}
         onRevertWorkflow={onRevertWorkflow}
+        onToggleWorkflow={onToggleWorkflow}
       />
     );
   }

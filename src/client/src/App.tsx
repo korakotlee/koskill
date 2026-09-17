@@ -16,6 +16,7 @@ import { AppTabNavigation, Tab } from './components/AppTabNavigation.js';
 import { initialSkills, initialMcp, initialWorkflows } from './mockData.js';
 import { useInventoryActions } from './hooks/useInventoryActions.js';
 import { useBackupAndVault } from './hooks/useBackupAndVault.js';
+import { useEntityToggles } from './hooks/useEntityToggles.js';
 
 export default function App(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<Tab>('skills');
@@ -109,6 +110,13 @@ export default function App(): React.ReactElement {
     setSelectedMcp,
   });
 
+  const { handleToggleSkill, handleToggleWorkflow } = useEntityToggles({
+    fetchInventory,
+    setFlash,
+    setSelectedSkill,
+    setSelectedWorkflow,
+  });
+
   const {
     isBackupOpen,
     setIsBackupOpen,
@@ -187,6 +195,8 @@ export default function App(): React.ReactElement {
             onRevertSkill={handleRevertSkill}
             onCentralizeWorkflow={handleCentralizeWorkflow}
             onRevertWorkflow={handleRevertWorkflow}
+            onToggleSkill={handleToggleSkill}
+            onToggleWorkflow={handleToggleWorkflow}
             onToggleMcp={handleToggleMcp}
             onCentralizeMcp={handleCentralizeMcp}
             onQueryTools={handleQueryMcpTools}
@@ -211,6 +221,7 @@ export default function App(): React.ReactElement {
                 onRevertSkill={handleRevertSkill}
                 onBatchCentralize={handleBatchCentralize}
                 onBatchRevert={handleBatchRevert}
+                onToggleSkill={handleToggleSkill}
               />
             )}
             {activeTab === 'workflows' && (
@@ -219,6 +230,7 @@ export default function App(): React.ReactElement {
                 onSelectWorkflow={(wf) => setSelectedWorkflow(wf)}
                 onCentralizeWorkflow={handleCentralizeWorkflow}
                 onRevertWorkflow={handleRevertWorkflow}
+                onToggleWorkflow={handleToggleWorkflow}
               />
             )}
             {activeTab === 'mcp' && (

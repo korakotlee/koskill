@@ -16,6 +16,8 @@ export interface DiscoveryTableProps {
   onRevertWorkflow?: (workflow: WorkflowManifest) => Promise<void> | void;
   onBatchCentralize?: (skillIds: string[]) => Promise<void> | void;
   onBatchRevert?: (skillIds: string[]) => Promise<void> | void;
+  onToggleSkill?: (skill: SkillManifest, enabled: boolean) => Promise<void> | void;
+  onToggleWorkflow?: (workflow: WorkflowManifest, enabled: boolean) => Promise<void> | void;
 }
 
 export const DiscoveryTable: React.FC<DiscoveryTableProps> = ({
@@ -29,6 +31,8 @@ export const DiscoveryTable: React.FC<DiscoveryTableProps> = ({
   onRevertWorkflow,
   onBatchCentralize,
   onBatchRevert,
+  onToggleSkill,
+  onToggleWorkflow,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -220,6 +224,7 @@ export const DiscoveryTable: React.FC<DiscoveryTableProps> = ({
             onSelectWorkflow={onSelectWorkflow}
             onCentralizeWorkflow={(wf) => openSingleAction(wf, 'centralize')}
             onRevertWorkflow={(wf) => openSingleAction(wf, 'revert')}
+            onToggleWorkflow={onToggleWorkflow}
           />
         ) : (
           <SkillTableRows
@@ -229,6 +234,7 @@ export const DiscoveryTable: React.FC<DiscoveryTableProps> = ({
             onSelectSkill={onSelectSkill}
             openSingleAction={openSingleAction}
             isSubmitting={isSubmitting}
+            onToggleSkill={onToggleSkill}
           />
         )}
       </div>

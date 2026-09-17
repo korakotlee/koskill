@@ -3,6 +3,9 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { EntityToggleSwitch } from '../components/EntityToggleSwitch.js';
 import { BackupModal } from '../components/BackupModal.js';
 import { VaultDrawer } from '../components/VaultDrawer.js';
+import { SkillDetailView } from '../components/SkillDetailView.js';
+import { WorkflowDetailView } from '../components/WorkflowDetailView.js';
+import { DiscoveryTable } from '../components/DiscoveryTable.js';
 
 describe('EntityToggleSwitch Component', () => {
   it('renders active toggle switch when enabled is true', () => {
@@ -200,3 +203,73 @@ describe('VaultDrawer Component', () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+
+describe('Detail Views and DiscoveryTable Toggle Wiring', () => {
+  const mockSkill: any = {
+    id: 'test-skill',
+    name: 'test-skill',
+    targetEcosystem: 'gemini',
+    sourcePath: '/path/to/skill',
+    status: 'original',
+    rawContent: '# Test Skill',
+  };
+
+  const mockWorkflow: any = {
+    id: 'test-workflow',
+    name: 'test-workflow',
+    command: '/test',
+    targetEcosystem: 'gemini',
+    sourcePath: '/path/to/workflow.md',
+    status: 'original',
+    scope: 'global',
+    rawContent: '# Test Workflow',
+  };
+
+  it('renders toggle switch next to status badge in SkillDetailView and triggers onToggleSkill', () => {
+    const onToggleSkill = vi.fn();
+    render(
+      <SkillDetailView
+        skill={mockSkill}
+        onBack={vi.fn()}
+        onToggleSkill={onToggleSkill}
+      />
+    );
+
+    const toggleBtn = screen.getByTestId('toggle-test-skill');
+    expect(toggleBtn).toBeDefined();
+    fireEvent.click(toggleBtn);
+    expect(onToggleSkill).toHaveBeenCalledWith(mockSkill, false);
+  });
+
+  it('renders toggle switch next to status badge in WorkflowDetailView and triggers onToggleWorkflow', () => {
+    const onToggleWorkflow = vi.fn();
+    render(
+      <WorkflowDetailView
+        workflow={mockWorkflow}
+        onBack={vi.fn()}
+        onToggleWorkflow={onToggleWorkflow}
+      />
+    );
+
+    const toggleBtn = screen.getByTestId('toggle-test-workflow');
+    expect(toggleBtn).toBeDefined();
+    fireEvent.click(toggleBtn);
+    expect(onToggleWorkflow).toHaveBeenCalledWith(mockWorkflow, false);
+  });
+
+  it('triggers onToggleSkill when toggle button is clicked in DiscoveryTable', () => {
+    const onToggleSkill = vi.fn();
+    render(
+      <DiscoveryTable
+        skills={[mockSkill]}
+        onToggleSkill={onToggleSkill}
+      />
+    );
+
+    const toggleBtn = screen.getByTestId('toggle-test-skill');
+    expect(toggleBtn).toBeDefined();
+    fireEvent.click(toggleBtn);
+    expect(onToggleSkill).toHaveBeenCalledWith(mockSkill, false);
+  });
+});
+

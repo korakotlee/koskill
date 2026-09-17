@@ -4,6 +4,7 @@ import { StorageStatusBadge } from './StorageStatusBadge.js';
 import { McpConfigSidebar } from './McpConfigSidebar.js';
 import { McpToolsTable } from './McpToolsTable.js';
 import { MarkdownViewer } from './MarkdownViewer.js';
+import { EntityToggleSwitch } from './EntityToggleSwitch.js';
 
 export interface McpDetailViewProps {
   server: McpServerManifest;
@@ -207,15 +208,15 @@ export const McpDetailView: React.FC<McpDetailViewProps> = ({
         )}
         <span className="Label Label--accent">{server.transport}</span>
         <StorageStatusBadge status={server.status || 'original'} />
-        <span
-          className="Label"
-          style={{
-            backgroundColor: isEnabled ? 'var(--color-success-subtle)' : 'var(--color-counter-bg)',
-            color: isEnabled ? 'var(--color-success-emphasis)' : 'var(--color-fg-muted)',
-          }}
-        >
-          {isEnabled ? 'Active' : 'Disabled'}
-        </span>
+        {onToggleEnabled && (
+          <EntityToggleSwitch
+            entityType="mcp-servers"
+            id={server.name}
+            enabled={isEnabled}
+            isLoading={isUpdating}
+            onToggle={(targetState) => onToggleEnabled(server, targetState)}
+          />
+        )}
       </div>
 
       {/* Two-Column Responsive Layout */}

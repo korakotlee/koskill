@@ -1,11 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import {
-  initCentralStore,
-  getSkillCentralPath,
-  getKoskillSkillsDir,
-  getKoskillJournalPath,
-} from './store.js';
+import { initCentralStore, getSkillCentralPath, getKoskillSkillsDir, getKoskillJournalPath } from './store.js';
 import { appendJournalEntry } from './journal.js';
 import { defaultLogger } from '../logger.js';
 import { SkillStatus } from '../types.js';
@@ -35,12 +30,7 @@ export interface CentralizeResult {
 /**
  * Options required to revert a symlinked skill back to original physical state.
  */
-export interface RevertSkillOptions {
-  skillId: string;
-  skillName: string;
-  sourcePath: string;
-  customHome?: string;
-}
+export type RevertSkillOptions = CentralizeSkillOptions;
 
 /**
  * Result of a skill reversion operation.
@@ -76,6 +66,10 @@ export async function getSkillStorageStatus(
   try {
     const lstat = await fs.lstat(skillPath);
 
+    if (skillPath.endsWith('.disabled')) {
+      return { status: 'inactive' };
+    }
+
     if (lstat.isSymbolicLink()) {
       const linkTarget = await fs.readlink(skillPath);
       const resolvedTarget = path.isAbsolute(linkTarget)
@@ -86,7 +80,13 @@ export async function getSkillStorageStatus(
         await fs.stat(skillPath);
         return { status: 'symlinked', targetPath: resolvedTarget };
       } catch {
-        return { status: 'broken-link', targetPath: resolvedTarget };
+        const disabledTarget = `${resolvedTarget}.disabled`;
+        try {
+          await fs.access(disabledTarget);
+          return { status: 'inactive', targetPath: disabledTarget };
+        } catch {
+          return { status: 'broken-link', targetPath: resolvedTarget };
+        }
       }
     }
 

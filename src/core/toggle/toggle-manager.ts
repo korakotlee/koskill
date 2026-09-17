@@ -18,8 +18,12 @@ export async function toggleEntity(options: ToggleOptions): Promise<ToggleResult
 
   try {
     if (entityType === 'skills') {
-      const baseDir = options.targetPath ? path.dirname(options.targetPath) : getKoskillSkillsDir(customHome);
-      const baseName = options.targetPath ? path.basename(options.targetPath).replace(/\.disabled$/, '') : id;
+      // Resolve the skill directory: targetPath may be the dir itself or point to SKILL.md inside it
+      const rawTarget = options.targetPath || '';
+      const isSkillFile = path.basename(rawTarget).replace(/\.disabled$/, '') === 'SKILL.md';
+      const skillDir = isSkillFile ? path.dirname(rawTarget) : rawTarget;
+      const baseDir = skillDir ? path.dirname(skillDir) : getKoskillSkillsDir(customHome);
+      const baseName = skillDir ? path.basename(skillDir).replace(/\.disabled$/, '') : id;
       const activePath = path.join(baseDir, baseName);
       const disabledPath = `${activePath}.disabled`;
 

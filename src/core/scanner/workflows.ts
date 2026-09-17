@@ -120,18 +120,23 @@ export async function scanGeminiWorkflows(
     const workflows: WorkflowManifest[] = [];
 
     for (const entry of entries) {
-      if ((!entry.isFile() && !entry.isSymbolicLink()) || !entry.name.endsWith('.md')) continue;
+      const isMd = entry.name.endsWith('.md');
+      const isMdDisabled = entry.name.endsWith('.md.disabled');
+      if ((!entry.isFile() && !entry.isSymbolicLink()) || (!isMd && !isMdDisabled)) continue;
 
       const filePath = path.join(directory, entry.name);
+      const storage = await inspectWorkflowStorage(filePath);
+      const readPath = storage.targetPath || filePath;
+
       try {
-        const rawContent = await fs.readFile(filePath, 'utf-8');
+        const rawContent = await fs.readFile(readPath, 'utf-8');
         const { attributes, metadata, body } = extractWorkflowFrontmatter(rawContent);
 
-        const baseName = entry.name.replace(/\.md$/, '');
+        const baseName = entry.name.replace(/\.disabled$/, '').replace(/\.md$/, '');
         const name = attributes.name || baseName;
         const description = attributes.description || extractFallbackDescription(body);
         const command = `/${name}`;
-        const storage = await inspectWorkflowStorage(filePath);
+        const status = isMdDisabled ? 'inactive' : storage.status;
 
         workflows.push({
           id: `gemini:${name}`,
@@ -141,7 +146,7 @@ export async function scanGeminiWorkflows(
           sourcePath: filePath,
           targetEcosystem: 'gemini',
           scope,
-          status: storage.status,
+          status,
           targetPath: storage.targetPath,
           metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
           rawContent
@@ -177,18 +182,23 @@ export async function scanClaudeCommands(
     const workflows: WorkflowManifest[] = [];
 
     for (const entry of entries) {
-      if ((!entry.isFile() && !entry.isSymbolicLink()) || !entry.name.endsWith('.md')) continue;
+      const isMd = entry.name.endsWith('.md');
+      const isMdDisabled = entry.name.endsWith('.md.disabled');
+      if ((!entry.isFile() && !entry.isSymbolicLink()) || (!isMd && !isMdDisabled)) continue;
 
       const filePath = path.join(directory, entry.name);
+      const storage = await inspectWorkflowStorage(filePath);
+      const readPath = storage.targetPath || filePath;
+
       try {
-        const rawContent = await fs.readFile(filePath, 'utf-8');
+        const rawContent = await fs.readFile(readPath, 'utf-8');
         const { attributes, metadata, body } = extractWorkflowFrontmatter(rawContent);
 
-        const baseName = entry.name.replace(/\.md$/, '');
+        const baseName = entry.name.replace(/\.disabled$/, '').replace(/\.md$/, '');
         const name = attributes.name || baseName;
         const description = attributes.description || extractFallbackDescription(body);
         const command = `/${name}`;
-        const storage = await inspectWorkflowStorage(filePath);
+        const status = isMdDisabled ? 'inactive' : storage.status;
 
         workflows.push({
           id: `claude:${name}`,
@@ -198,7 +208,7 @@ export async function scanClaudeCommands(
           sourcePath: filePath,
           targetEcosystem: 'claude',
           scope,
-          status: storage.status,
+          status,
           targetPath: storage.targetPath,
           metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
           rawContent

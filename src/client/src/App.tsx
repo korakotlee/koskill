@@ -87,6 +87,7 @@ export default function App(): React.ReactElement {
     handleToggleMcp,
     handleGenerateMcpSubset,
     handleQueryMcpTools,
+    handleDiscoverMcp,
   } = useInventoryActions(fetchInventory, {
     setSelectedSkill,
     setSelectedWorkflow,
@@ -168,6 +169,7 @@ export default function App(): React.ReactElement {
             onToggleEnabled={handleToggleMcp}
             onCentralize={handleCentralizeMcp}
             onQueryTools={handleQueryMcpTools}
+            onDiscoverServer={handleDiscoverMcp}
           />
         ) : (
           <>
@@ -234,6 +236,7 @@ export default function App(): React.ReactElement {
                 onGenerateSubset={handleGenerateMcpSubset}
                 onToggleEnabled={handleToggleMcp}
                 onCentralizeServer={handleCentralizeMcp}
+                onDiscoverServer={handleDiscoverMcp}
               />
             )}
             {activeTab === 'conflicts' && (

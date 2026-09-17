@@ -4,6 +4,7 @@ import { handleDiscoveryRoutes } from './routes/discovery.js';
 import { handleStorageRoutes } from './routes/storage.js';
 import { handleWorkflowStorageRoutes } from './routes/workflow-storage.js';
 import { handleMcpRoutes } from './routes/mcp.js';
+import { handleSearchRoutes } from './routes/search.js';
 
 export interface AppServer {
   server: http.Server;
@@ -59,6 +60,9 @@ export async function startServer(preferredPort?: number): Promise<AppServer> {
 
       const mcpHandled = await handleMcpRoutes(req, res, url);
       if (mcpHandled) return;
+
+      const searchHandled = await handleSearchRoutes(req, res, url);
+      if (searchHandled) return;
     } catch (err: any) {
       defaultLogger.error('Unhandled router error', { error: err.message, path: url.pathname });
       res.writeHead(500);

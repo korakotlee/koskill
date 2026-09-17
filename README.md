@@ -78,6 +78,9 @@ flowchart LR
 - **Global Discovery**: Automatically scan global and workspace configurations from Gemini CLI, AntiGravity (AGY), Codex, Claude Code, and Cloud Code for skills, custom workflows, and MCP servers.
 - **Workflow & Slash Command Support**: Discover and inspect custom slash commands across Gemini CLI (`~/.gemini/config/global_workflows/`, `.agent/workflows/`) and Claude Code (`~/.claude/commands/`, `.claude/commands/`) with dedicated syntax hints and permission views.
 - **Central Storage & Symlinking**: Consolidate scattered configurations into `~/.koskill/` and manage symlinks to target environments transparently. User can pick and choose which one they want to leave in the original config or move / symlink to ~/.koskill
+- **Embedded Hybrid Search**: Sub-30ms similarity scoring and lexical search combining `sqlite-vec` dense embeddings and SQLite FTS5 BM25 with Reciprocal Rank Fusion (RRF) at `~/.koskill/cache/index.db`.
+- **Local ONNX Embeddings**: Zero-cloud inference using `@xenova/transformers` (384 dimensions) with lazy loading to guarantee sub-200ms cold starts.
+- **Semantic Conflict & Collision Detection**: Detect semantically identical skills with different titles (cosine similarity >= 0.85) and identify prompt instruction collisions for shared command triggers.
 - **Conflict & Duplicate Detection**: Identify conflicting instructions, duplicate MCP tools, and name collisions across ecosystems.
 - **Resolution Workflows**: Interactively choose preferred definitions, set workspace overrides, or merge complementary configs.
 - **Instant Activation Toggles**: Enable or disable specific skills and MCP servers globally or on a per-project basis with a single click.
@@ -91,6 +94,8 @@ flowchart LR
 - **Frontend**: React, TypeScript, Vite
 - **Backend API**: Node.js HTTP Server (strictly bound to `127.0.0.1`)
 - **Core Engine**: TypeScript modular services
+- **Search & Vectors**: SQLite with `sqlite-vec` (dense vector embeddings) and FTS5 (BM25 lexical search)
+- **Local Embeddings**: `@xenova/transformers` (local ONNX neural inference)
 - **Distribution**: npm CLI package (`npx koskill`), optional Homebrew tap planned
 - **Storage**: Local filesystem (`~/.koskill`, system config directories)
 

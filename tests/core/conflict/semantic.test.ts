@@ -11,6 +11,7 @@ import { LocalEmbedder } from '../../../src/core/search/embedder.js';
 import {
   findSemanticDuplicates,
   findSemanticConflicts,
+  detectSemanticConflicts,
 } from '../../../src/core/conflict/semantic.js';
 import { routeCapabilities } from '../../../src/core/search/hybrid.js';
 
@@ -124,10 +125,24 @@ describe('Semantic Conflict and Duplicate Detection', () => {
     expect(deployConflict?.divergence).toBeGreaterThan(0.2);
   });
 
-  it('routes capabilities to top matching skills or workflows', async () => {
-    const results = await routeCapabilities(db, 'deploy to kubernetes helm cluster', { limit: 2 });
+  it('generates structured ConflictReport objects for Tier 2 and Tier 3 conflicts', async () => {
+    const reports = await detectSemanticConflicts(db, embedder, {
+      duplicateThreshold: 0.85,
+      divergenceThreshold: 0.2,
+    });
 
-    expect(results.length).toBeGreaterThan(0);
-    expect(results[0].id).toBe('workflow:deploy-k8s');
+    expect(reports.length).toBeGreaterThanOrEqual(2);
+
+    const dupReport = reports.find((r) => r.conflictType === 'SEMANTIC_DUPLICATE');
+    expect(dupReport).toBeDefined();
+    expect(dupReport?.severity).toBe('WARNING');
+    expect(dupReport?.similarityScore).toBeGreaterThanOrEqual(0.85);
+    expect(dupReport?.diffSummary).toBeDefined();
+    expect(dupReport?.diffSummary?.unifiedDiff).toContain('---');
+
+    const instrReport = reports.find((r) => r.conflictType === 'INSTRUCTION_DIVERGENCE');
+    expect(instrReport).toBeDefined();
+    expect(instrReport?.matchedSnippet).toBe('Trigger: /deploy');
+    expect(instrReport?.diffSummary).toBeDefined();
   });
 });

@@ -5,6 +5,8 @@ import {
   SemanticConflictMatch,
 } from '../search/types.js';
 import { LocalEmbedder, getEmbedder } from '../search/embedder.js';
+import { ConflictReport, ConflictItem } from './types.js';
+import { generateDiff } from './diff.js';
 
 export interface SemanticDuplicateOptions {
   threshold?: number;
@@ -158,3 +160,112 @@ export async function findSemanticConflicts(
 
   return conflicts;
 }
+
+export interface DetectSemanticConflictOptions {
+  duplicateThreshold?: number;
+  divergenceThreshold?: number;
+}
+
+/**
+ * Executes Tier 2 and Tier 3 conflict analysis using vector KNN and trigger comparisons,
+ * compiling unified ConflictReport objects with diffs and similarity scores.
+ */
+export async function detectSemanticConflicts(
+  db: SearchDatabase,
+  embedder?: LocalEmbedder,
+  options: DetectSemanticConflictOptions = {}
+): Promise<ConflictReport[]> {
+  const reports: ConflictReport[] = [];
+
+  const getItemDetails = (id: string): ConflictItem | null => {
+    const row = db
+      .prepare(
+        `SELECT m.id, m.name, m.ecosystem, m.source_path, m.content_hash, m.command, f.content, f.description
+         FROM items_meta m
+         LEFT JOIN items_fts f ON m.id = f.id
+         WHERE m.id = ?`
+      )
+      .get(id) as {
+        id: string;
+        name: string;
+        ecosystem: string;
+        source_path: string;
+        content_hash: string;
+        command?: string;
+        content?: string;
+        description?: string;
+      } | undefined;
+
+    if (!row) return null;
+    return {
+      id: row.id,
+      name: row.name,
+      ecosystem: row.ecosystem,
+      sourcePath: row.source_path,
+      contentHash: row.content_hash,
+      command: row.command,
+      content: row.content,
+      description: row.description,
+    };
+  };
+
+  // 1. Tier 2: Semantic Duplicates
+  const duplicates = await findSemanticDuplicates(db, embedder, {
+    threshold: options.duplicateThreshold ?? 0.85,
+  });
+
+  for (const dup of duplicates) {
+    const itemA = getItemDetails(dup.firstId);
+    const itemB = getItemDetails(dup.secondId);
+    if (!itemA || !itemB) continue;
+
+    const diffSummary = generateDiff(itemA.content || '', itemB.content || '', {
+      oldHeader: `${itemA.ecosystem}/${itemA.name}`,
+      newHeader: `${itemB.ecosystem}/${itemB.name}`,
+    });
+
+    const percentMatch = Math.round(dup.similarity * 100);
+    reports.push({
+      id: `semantic-dup-${dup.firstId}-${dup.secondId}`,
+      conflictType: 'SEMANTIC_DUPLICATE',
+      severity: 'WARNING',
+      title: `Semantic Duplicate: ${itemA.name} & ${itemB.name}`,
+      description: `Skills "${itemA.name}" and "${itemB.name}" exhibit ${percentMatch}% semantic similarity.`,
+      similarityScore: dup.similarity,
+      matchedSnippet: `${percentMatch}% match`,
+      items: [itemA, itemB],
+      diffSummary,
+    });
+  }
+
+  // 2. Tier 3: Instruction Divergence
+  const divergences = await findSemanticConflicts(db, embedder, {
+    divergenceThreshold: options.divergenceThreshold ?? 0.2,
+  });
+
+  for (const div of divergences) {
+    const itemA = getItemDetails(div.firstId);
+    const itemB = getItemDetails(div.secondId);
+    if (!itemA || !itemB) continue;
+
+    const diffSummary = generateDiff(itemA.content || '', itemB.content || '', {
+      oldHeader: `${itemA.ecosystem}/${itemA.name}`,
+      newHeader: `${itemB.ecosystem}/${itemB.name}`,
+    });
+
+    reports.push({
+      id: `instruction-div-${div.command.replace(/^\//, '')}-${div.firstId}-${div.secondId}`,
+      conflictType: 'INSTRUCTION_DIVERGENCE',
+      severity: 'WARNING',
+      title: `Instruction Divergence on Command: ${div.command}`,
+      description: `Multiple items share command trigger "${div.command}" but present conflicting prompt directives.`,
+      similarityScore: div.similarity,
+      matchedSnippet: `Trigger: ${div.command}`,
+      items: [itemA, itemB],
+      diffSummary,
+    });
+  }
+
+  return reports;
+}
+

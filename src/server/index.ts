@@ -6,6 +6,9 @@ import { handleWorkflowStorageRoutes } from './routes/workflow-storage.js';
 import { handleMcpRoutes } from './routes/mcp.js';
 import { handleSearchRoutes } from './routes/search.js';
 import { handleConflictRoutes } from './routes/conflict.js';
+import { handleToggleRoutes } from './routes/toggle.js';
+import { handleBackupRoutes } from './routes/backup.js';
+import { handleVaultRoutes } from './routes/vault.js';
 
 export interface AppServer {
   server: http.Server;
@@ -67,6 +70,15 @@ export async function startServer(preferredPort?: number): Promise<AppServer> {
 
       const conflictHandled = await handleConflictRoutes(req, res, url);
       if (conflictHandled) return;
+
+      const toggleHandled = await handleToggleRoutes(req, res, url);
+      if (toggleHandled) return;
+
+      const backupHandled = await handleBackupRoutes(req, res, url);
+      if (backupHandled) return;
+
+      const vaultHandled = await handleVaultRoutes(req, res, url);
+      if (vaultHandled) return;
     } catch (err: any) {
       defaultLogger.error('Unhandled router error', { error: err.message, path: url.pathname });
       res.writeHead(500);

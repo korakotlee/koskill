@@ -4,12 +4,14 @@ import { MarkdownViewer } from './MarkdownViewer.js';
 import { StorageStatusBadge } from './StorageStatusBadge.js';
 import { SymlinkActions } from './SymlinkActions.js';
 import { CentralizeConfirmModal } from './CentralizeConfirmModal.js';
+import { EntityToggleSwitch } from './EntityToggleSwitch.js';
 
 export interface SkillDetailViewProps {
   skill: SkillManifest;
   onBack: () => void;
   onCentralizeSkill?: (skill: SkillManifest) => Promise<void> | void;
   onRevertSkill?: (skill: SkillManifest) => Promise<void> | void;
+  onToggleSkill?: (skill: SkillManifest, enabled: boolean) => Promise<void> | void;
 }
 
 export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
@@ -17,6 +19,7 @@ export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
   onBack,
   onCentralizeSkill,
   onRevertSkill,
+  onToggleSkill,
 }) => {
   const [modalAction, setModalAction] = useState<'centralize' | 'revert' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,6 +93,14 @@ export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
         <h2 style={{ fontSize: '24px', fontWeight: 600, margin: 0 }}>{skill.name}</h2>
         <span className={badgeClass}>{skill.targetEcosystem}</span>
         <StorageStatusBadge status={skill.status} />
+        {onToggleSkill && (
+          <EntityToggleSwitch
+            entityType="skills"
+            id={skill.name}
+            enabled={skill.status !== 'inactive'}
+            onToggle={(targetState) => onToggleSkill(skill, targetState)}
+          />
+        )}
       </div>
 
       {skill.description && (

@@ -2,6 +2,7 @@ import React from 'react';
 import { SkillManifest } from '../../../core/types.js';
 import { StorageStatusBadge } from './StorageStatusBadge.js';
 import { SymlinkActions } from './SymlinkActions.js';
+import { EntityToggleSwitch } from './EntityToggleSwitch.js';
 
 export interface SkillTableRowsProps {
   skills: SkillManifest[];
@@ -9,6 +10,7 @@ export interface SkillTableRowsProps {
   toggleRow: (id: string) => void;
   onSelectSkill?: (skill: SkillManifest) => void;
   openSingleAction: (skill: SkillManifest, action: 'centralize' | 'revert') => void;
+  onToggleSkill?: (skill: SkillManifest, enabled: boolean) => void;
   isSubmitting: boolean;
 }
 
@@ -18,6 +20,7 @@ export const SkillTableRows: React.FC<SkillTableRowsProps> = ({
   toggleRow,
   onSelectSkill,
   openSingleAction,
+  onToggleSkill,
   isSubmitting,
 }) => {
   return (
@@ -67,6 +70,12 @@ export const SkillTableRows: React.FC<SkillTableRowsProps> = ({
                 </button>
                 <span className={badgeClass}>{skill.targetEcosystem}</span>
                 <StorageStatusBadge status={skill.status} />
+                <EntityToggleSwitch
+                  entityType="skills"
+                  id={skill.name}
+                  enabled={skill.status !== 'inactive'}
+                  onToggle={(targetState) => onToggleSkill?.(skill, targetState)}
+                />
               </div>
 
               {skill.description && (

@@ -54,16 +54,20 @@ export async function inspectWorkflowStorage(
 ): Promise<WorkflowStorageInspection> {
   const centralWorkflowsDir = getKoskillWorkflowsDir(customHome);
 
+  if (workflowPath.endsWith('.disabled')) {
+    return { status: 'inactive' };
+  }
+
   try {
     const lstat = await fs.lstat(workflowPath);
 
     if (lstat.isSymbolicLink()) {
-      try {
-        const rawLink = await fs.readlink(workflowPath);
-        const resolvedLink = path.isAbsolute(rawLink)
-          ? rawLink
-          : path.resolve(path.dirname(workflowPath), rawLink);
+      const rawLink = await fs.readlink(workflowPath);
+      const resolvedLink = path.isAbsolute(rawLink)
+        ? rawLink
+        : path.resolve(path.dirname(workflowPath), rawLink);
 
+      try {
         await fs.stat(resolvedLink);
 
         if (resolvedLink.startsWith(centralWorkflowsDir)) {
@@ -72,7 +76,13 @@ export async function inspectWorkflowStorage(
         return { status: 'symlinked', targetPath: resolvedLink };
       } catch (err: any) {
         if (err.code === 'ENOENT') {
-          return { status: 'broken-link' };
+          const disabledTarget = `${resolvedLink}.disabled`;
+          try {
+            await fs.access(disabledTarget);
+            return { status: 'inactive', targetPath: disabledTarget };
+          } catch {
+            return { status: 'broken-link' };
+          }
         }
         throw err;
       }

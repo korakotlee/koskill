@@ -6,6 +6,8 @@ export interface AppHeaderProps {
   colorMode: 'light' | 'dark';
   onRefresh: () => void;
   onToggleTheme: () => void;
+  onOpenBackup?: () => void;
+  onOpenVault?: () => void;
 }
 
 /**
@@ -18,6 +20,8 @@ export function AppHeader({
   colorMode,
   onRefresh,
   onToggleTheme,
+  onOpenBackup,
+  onOpenVault,
 }: AppHeaderProps): React.ReactElement {
   return (
     <header className="App-header">
@@ -55,6 +59,26 @@ export function AppHeader({
         >
           {isRefreshing ? 'Scanning...' : 'Refresh Discovery'}
         </button>
+        {onOpenBackup && (
+          <button
+            type="button"
+            className="Btn"
+            onClick={onOpenBackup}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            Backup
+          </button>
+        )}
+        {onOpenVault && (
+          <button
+            type="button"
+            className="Btn"
+            onClick={onOpenVault}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            Vault
+          </button>
+        )}
         <button
           type="button"
           className="Theme-toggle"

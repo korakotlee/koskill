@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { McpServerManifest } from '../../../core/types.js';
 import { StorageStatusBadge } from './StorageStatusBadge.js';
+import { EntityToggleSwitch } from './EntityToggleSwitch.js';
 
 export interface McpServerListProps {
   servers: McpServerManifest[];
@@ -177,14 +178,12 @@ export const McpServerList: React.FC<McpServerListProps> = ({
                 )}
 
                 {onToggleEnabled && (
-                  <button
-                    type="button"
-                    className="Btn"
-                    style={{ fontSize: '12px', padding: '3px 8px' }}
-                    onClick={() => onToggleEnabled(mcp, !isEnabled)}
-                  >
-                    {isEnabled ? 'Disable' : 'Enable'}
-                  </button>
+                  <EntityToggleSwitch
+                    entityType="mcp-servers"
+                    id={mcp.name}
+                    enabled={isEnabled}
+                    onToggle={(targetState) => onToggleEnabled(mcp, targetState)}
+                  />
                 )}
 
                 {onCentralizeServer && mcp.status !== 'centralized' && (

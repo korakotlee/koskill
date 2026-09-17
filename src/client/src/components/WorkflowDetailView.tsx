@@ -4,12 +4,14 @@ import { MarkdownViewer } from './MarkdownViewer.js';
 import { StorageStatusBadge } from './StorageStatusBadge.js';
 import { SymlinkActions } from './SymlinkActions.js';
 import { CentralizeConfirmModal } from './CentralizeConfirmModal.js';
+import { EntityToggleSwitch } from './EntityToggleSwitch.js';
 
 export interface WorkflowDetailViewProps {
   workflow: WorkflowManifest;
   onBack: () => void;
   onCentralizeWorkflow?: (workflow: WorkflowManifest) => Promise<void> | void;
   onRevertWorkflow?: (workflow: WorkflowManifest) => Promise<void> | void;
+  onToggleWorkflow?: (workflow: WorkflowManifest, enabled: boolean) => Promise<void> | void;
 }
 
 export const WorkflowDetailView: React.FC<WorkflowDetailViewProps> = ({
@@ -17,6 +19,7 @@ export const WorkflowDetailView: React.FC<WorkflowDetailViewProps> = ({
   onBack,
   onCentralizeWorkflow,
   onRevertWorkflow,
+  onToggleWorkflow,
 }) => {
   const [modalAction, setModalAction] = useState<'centralize' | 'revert' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,6 +98,14 @@ export const WorkflowDetailView: React.FC<WorkflowDetailViewProps> = ({
         </h2>
         <span className={badgeClass}>{workflow.targetEcosystem}</span>
         <StorageStatusBadge status={workflow.status || 'original'} />
+        {onToggleWorkflow && (
+          <EntityToggleSwitch
+            entityType="workflows"
+            id={workflow.name}
+            enabled={workflow.status !== 'inactive'}
+            onToggle={(targetState) => onToggleWorkflow(workflow, targetState)}
+          />
+        )}
         <span className="Label Label--secondary">{workflow.scope}</span>
       </div>
 

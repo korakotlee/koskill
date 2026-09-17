@@ -60,13 +60,14 @@ export async function scanGeminiSkills(
     for (const entry of entries) {
       if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
 
+      const baseEntryName = entry.name.replace(/\.disabled$/, '');
       const skillDir = path.join(skillsDirectory, entry.name);
       const storageInspection = await getSkillStorageStatus(skillDir, options?.customHome);
 
       if (storageInspection.status === 'broken-link') {
         skills.push({
-          id: `gemini:${entry.name}`,
-          name: entry.name,
+          id: `gemini:${baseEntryName}`,
+          name: baseEntryName,
           description: 'Broken symbolic link destination missing',
           sourcePath: skillDir,
           targetEcosystem: 'gemini',
@@ -76,12 +77,13 @@ export async function scanGeminiSkills(
         continue;
       }
 
-      const skillPath = path.join(skillDir, 'SKILL.md');
+      const inspectDir = storageInspection.targetPath || skillDir;
+      const skillPath = path.join(inspectDir, 'SKILL.md');
       try {
         const rawContent = await fs.readFile(skillPath, 'utf-8');
         const { attributes, body } = extractFrontmatter(rawContent);
 
-        const name = attributes.name || entry.name;
+        const name = attributes.name || baseEntryName;
         let description = attributes.description || '';
         if (!description) {
           const lines = body.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -93,7 +95,7 @@ export async function scanGeminiSkills(
           id: `gemini:${name}`,
           name,
           description,
-          sourcePath: skillPath,
+          sourcePath: path.join(skillDir, 'SKILL.md'),
           targetEcosystem: 'gemini',
           status: storageInspection.status,
           targetPath: storageInspection.targetPath,

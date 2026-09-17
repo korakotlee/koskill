@@ -83,9 +83,9 @@ flowchart LR
 - **Local ONNX Embeddings**: Zero-cloud inference using `@xenova/transformers` (384 dimensions) with lazy loading to guarantee sub-200ms cold starts.
 - **Tiered Conflict & Deduplication Engine**: Detect exact name collisions, identical SHA-256 CAS content hashes, colliding MCP tool signatures across servers, semantic duplicates (cosine similarity >= 0.85), and prompt instruction divergences on shared command triggers.
 - **Side-by-Side Diff & Resolution UI**: Compare conflicting `SKILL.md` instructions with unified line diffs, similarity match badges (e.g. "94% Match"), and execute atomic `PICK` (keep winner, archive loser), `ALIAS` (rename), or `MERGE` (combine configs) actions with optimistic CAS hash validation and pre-resolution snapshot backups.
-- **Instant Activation Toggles**: Enable or disable specific skills and MCP servers globally or on a per-project basis with a single click.
-- **Backup & Migration**: Export your curated skill set and restore it on new development machines effortlessly.
-- **Credential & API Key Safety**: Manage sensitive API keys and tokens in a secure local vault rather than spreading them across plain text files.
+- **Instant Activation Toggles**: Enable or disable specific skills, workflows, and MCP servers with atomic filesystem operations (`.disabled` extension renaming or symlink unlinking) ensuring immediate invisibility to CLI agents, exposed via `POST /api/:entityType/:id/toggle` and dashboard toggle controls.
+- **Machine-to-Machine Backup & Restore**: Export centralized assets (`~/.koskill/skills`, `workflows`, `mcp`, `journal.json`) into portable `.tar.gz` archives with embedded `backup-manifest.json` and restore them on new development workstations with strict tar-slip directory traversal prevention and collision safeguards.
+- **Local Credential Vault**: Securely manage sensitive API keys and tokens in an isolated local vault at `~/.koskill/vault/secrets.json` enforced with POSIX `0600` file permissions, secret masking in REST responses, and an interactive UI configuration drawer.
 
 ---
 
@@ -113,16 +113,22 @@ koskill/
 ├── _tickets/                  # Task tracking (pending and completed)
 ├── src/                       # Source codebase
 │   ├── core/                  # Core domain models, contracts, and logger
+│   │   ├── backup/            # Backup exporter, importer, and tar-slip protection
+│   │   ├── conflict/          # Conflict detector, semantic matcher, and resolver
+│   │   ├── mcp/               # Model Context Protocol discovery client
 │   │   ├── scanner/           # Discovery scanner for Gemini and Claude
+│   │   ├── search/            # Embedded hybrid search engine (sqlite-vec + BM25)
 │   │   ├── storage/           # Central store, symlink manager, and journal
+│   │   ├── toggle/            # Filesystem-level entity activation toggle manager
+│   │   ├── vault/             # POSIX 0600 local credential vault
 │   │   ├── logger.ts          # Centralized structured logger
 │   │   └── types.ts           # Shared domain types and type guards
 │   ├── server/                # Node.js HTTP daemon
-│   │   ├── routes/            # REST API route handlers (discovery, storage)
-│   │   └── index.ts           # Server entrypoint and health route
-│   └── client/                # Vite + React frontend dashboard
+│   │   ├── routes/            # REST API route handlers (toggle, backup, vault, etc.)
+│   │   └── index.ts           # Daemon entrypoint and router pipeline
+│   └── client/                # React + Vite frontend application
 │       ├── index.html         # Frontend HTML entrypoint
-│       └── src/               # React components, styles, and tests
+│       └── src/               # React components, styles, hooks, and tests
 ├── tests/                     # Automated unit, route, and component tests
 ├── AGENTS.md                  # Operational rules and coding invariants for AI agents
 ├── CHANGELOG.md               # Release notes following Keep a Changelog

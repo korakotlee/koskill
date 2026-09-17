@@ -166,16 +166,37 @@ The React client adopts the GitHub Primer design system:
 - **Workflow Detail View (`WorkflowDetailView.tsx`)**: Dedicated inspection view featuring invocation syntax display, argument hints, tool permission badges, Centralize/Revert action triggers, and raw prompt instruction panel.
 - **MCP Server List (`McpServerList.tsx`)**: Inventory of configured MCP servers with titles, version badges, description snippets, quick "Discover" actions with spinner states, activation toggle buttons, and an action bar to generate `agents_mcp/servers.json`.
 - **MCP Detail View (`McpDetailView.tsx`)**: Dedicated inspection view featuring Server Overview card, Agent Instructions markdown viewer, tool capability tables (`McpToolsTable.tsx`), runtime command/args, transport type, and interactive "Discover Server" action.
+- **Backup & Restore Modal (`BackupModal.tsx`)**: Modal dialog for machine-to-machine `.tar.gz` export and import with tar-slip protection and collision alerts.
+- **Credential Vault Drawer (`VaultDrawer.tsx`)**: Slide-out drawer for secure local API key configuration with masked previews and password inputs.
+- **Entity Toggle Switch (`EntityToggleSwitch.tsx`)**: Reusable toggle button with optimistic status feedback across skills, workflows, and MCP servers.
 - **Markdown Viewer (`MarkdownViewer.tsx`)**: Primer README-style container rendering `SKILL.md` and workflow markdown via `marked`, featuring clean frontmatter extraction and bold key/normal text styling.
-
 
 ---
 
-## 8. Security, Cryptography & Privacy
+## 8. Activation Toggles, Backup Packaging & Credential Vault
+
+### Activation Toggle Engine (`src/core/toggle/`)
+- **Filesystem-Level Guarantees**: Rather than relying purely on internal database flags, toggles modify the filesystem state (unlinking symlinks or appending `.disabled` to directory and file names). External AI agents and CLI tools inspecting paths directly will immediately ignore disabled items.
+- **Unified REST API**: `POST /api/:entityType/:id/toggle` validates `:entityType` against `skills`, `workflows`, and `mcp-servers`, updates disk state, and logs the operation in `~/.koskill/journal.json`.
+
+### Machine-to-Machine Backup & Restore (`src/core/backup/`)
+- **Scoped Packaging**: Exports centralized items in `~/.koskill/` (`skills/`, `workflows/`, `mcp/`, and `journal.json`) into a gzip tarball (`.tar.gz`) along with an embedded `backup-manifest.json` recording item counts and versions.
+- **Tar-Slip Prevention**: Importer validates every archive entry using `validateArchiveEntries`, rejecting any entry that contains parent path traversals (`..`), absolute roots, or resolves outside destination root.
+- **Collision Safeguards**: Prevents silent overwriting of existing items during restore unless `overwrite: true` is explicitly passed.
+
+### Local Credential Vault (`src/core/vault/`)
+- **POSIX Permission Isolation**: Directory `~/.koskill/vault/` is restricted to mode `0700`, and `secrets.json` is restricted to mode `0600` (read/write limited exclusively to file owner).
+- **Atomic Operations & Fallbacks**: Writes stage through temporary files (`.tmp`) and preserve existing versions as `.bak` prior to `rename`.
+- **Secret Masking Invariants**: Plaintext secrets are never returned in public API payloads or written to log files; the REST API (`GET /api/vault`) returns masked strings (e.g., `sk-...48a9` or `****`).
+
+---
+
+## 9. Security, Cryptography & Privacy
 
 - **Localhost Binding**: All HTTP services bind strictly to `127.0.0.1` to prevent LAN exposure.
 - **Read-Only Inspection**: Discovery scanning performs strictly read-only filesystem reads.
-- **No Plaintext Logging**: Secrets and authentication tokens inside MCP configs are not output to logs.
+- **Credential Isolation**: Local credential vault enforces POSIX `0600` file permissions and excludes secrets from backups by default.
+- **No Plaintext Logging**: Secrets and authentication tokens inside MCP configs and vault are never output to logs.
 
 ---
 

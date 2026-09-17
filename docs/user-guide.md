@@ -9,8 +9,11 @@ This guide covers setup, discovery workflows, and the Conflict Detection and Res
 1. [System Requirements](#1-system-requirements)
 2. [Quick Start](#2-quick-start)
 3. [Conflict Detection & Resolution](#3-conflict-detection--resolution)
-4. [Central Store & Symlink Management](#4-central-store--symlink-management)
-5. [Troubleshooting & Logs](#5-troubleshooting--logs)
+4. [Activation Toggles](#4-activation-toggles)
+5. [Backup & Restore Packaging](#5-backup--restore-packaging)
+6. [Local Credential Vault](#6-local-credential-vault)
+7. [Central Store & Symlink Management](#7-central-store--symlink-management)
+8. [Troubleshooting & Logs](#8-troubleshooting--logs)
 
 ---
 
@@ -65,7 +68,43 @@ KoSkill enforces optimistic Compare-And-Swap (CAS) SHA-256 verification before w
 
 ---
 
-## 4. Central Store & Symlink Management
+## 4. Activation Toggles
+
+KoSkill enables you to disable or re-enable individual skills, workflows, and MCP servers without deleting files:
+- Click the **Active / Inactive** toggle switch next to any skill, workflow, or MCP server.
+- Toggling modifies the underlying filesystem state (such as appending `.disabled` to directory and file names or updating MCP registry states).
+- Disabled items are immediately ignored by external CLI tools, IDE extensions, and AI coding agents.
+- Toggling can also be executed via REST API:
+  ```bash
+  curl -X POST http://127.0.0.1:3900/api/skills/my-skill/toggle \
+    -H "Content-Type: application/json" \
+    -d '{"enabled": false}'
+  ```
+
+---
+
+## 5. Backup & Restore Packaging
+
+Migrate your curated skills, workflows, MCP servers, and transaction history between developer machines:
+- Click **Backup** in the header or Settings tab to open the Backup & Restore dialog.
+- **Export**: Click "Export Backup" to generate a compressed `.tar.gz` archive with embedded `backup-manifest.json`. Local credentials are automatically excluded by default for security.
+- **Import**: Enter the archive file path and click "Import Archive".
+- **Tar-Slip Protection**: The importer verifies all archive entries before extraction, blocking any malicious path traversal attempts (`..` or absolute paths).
+- **Collision Safeguards**: Pre-existing files are protected unless the "Overwrite existing items" option is checked.
+
+---
+
+## 6. Local Credential Vault
+
+Safely configure and store API credentials for your coding assistants and MCP tools without exposing plaintext in git repositories:
+- Click **Vault** in the header or Settings tab to open the Credential Vault drawer.
+- **Masked Previews**: Stored keys (e.g., `OPENAI_API_KEY`) display masked tokens (e.g., `sk-...48a9`) so secrets are never displayed in full or leaked in logs.
+- **Strict POSIX Permissions**: The vault directory `~/.koskill/vault/` is secured with mode `0700`, and `secrets.json` is secured with mode `0600` (strictly readable and writable by the file owner only).
+- **Add / Update Secret**: Enter the key name and secret value to save atomically with `.bak` rollback protection.
+
+---
+
+## 7. Central Store & Symlink Management
 
 Centralize items into `~/.koskill/` to synchronize prompts across multiple AI agent tools:
 - Click **Centralize** on any skill card to migrate it to `~/.koskill/skills/<name>` and create transparent symlinks back to source directories.
@@ -73,7 +112,7 @@ Centralize items into `~/.koskill/` to synchronize prompts across multiple AI ag
 
 ---
 
-## 5. Troubleshooting & Logs
+## 8. Troubleshooting & Logs
 
 - Structured runtime logs are written to `log/agent.log`.
 - To inspect active HTTP daemon health:
@@ -83,4 +122,8 @@ Centralize items into `~/.koskill/` to synchronize prompts across multiple AI ag
 - To verify current conflict reports via curl:
   ```bash
   curl http://127.0.0.1:3900/api/conflicts
+  ```
+- To view masked vault keys via curl:
+  ```bash
+  curl http://127.0.0.1:3900/api/vault
   ```

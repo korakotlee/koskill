@@ -4,7 +4,11 @@ import { SkillManifest, McpServerManifest, WorkflowManifest } from '../../core/t
 import { DiscoveryTable } from './components/DiscoveryTable.js';
 import { SkillDetailView } from './components/SkillDetailView.js';
 import { WorkflowDetailView } from './components/WorkflowDetailView.js';
+import { McpDetailView } from './components/McpDetailView.js';
+import { FlashNotification } from './components/FlashNotification.js';
+import { McpServerList } from './components/McpServerList.js';
 import { initialSkills, initialMcp, initialWorkflows } from './mockData.js';
+import { useInventoryActions } from './hooks/useInventoryActions.js';
 
 type Tab = 'skills' | 'workflows' | 'mcp' | 'conflicts' | 'settings';
 
@@ -16,6 +20,7 @@ export default function App(): React.ReactElement {
   const [workflows, setWorkflows] = useState<WorkflowManifest[]>(initialWorkflows);
   const [selectedSkill, setSelectedSkill] = useState<SkillManifest | null>(null);
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowManifest | null>(null);
+  const [selectedMcp, setSelectedMcp] = useState<McpServerManifest | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
@@ -33,30 +38,30 @@ export default function App(): React.ReactElement {
       const [skillsRes, mcpRes, workflowsRes] = await Promise.all([
         fetch('/api/skills'),
         fetch('/api/mcp'),
-        fetch('/api/workflows')
+        fetch('/api/workflows'),
       ]);
 
       if (skillsRes.ok) {
         const skillsData = await skillsRes.json();
         if (Array.isArray(skillsData.skills)) {
           setSkills(skillsData.skills);
+          setSelectedSkill((prev) => (prev ? skillsData.skills.find((s: SkillManifest) => s.id === prev.id) || prev : null));
         }
       }
-
       if (mcpRes.ok) {
         const mcpData = await mcpRes.json();
         if (Array.isArray(mcpData.servers)) {
           setMcpServers(mcpData.servers);
+          setSelectedMcp((prev) => (prev ? mcpData.servers.find((s: McpServerManifest) => s.id === prev.id || s.name === prev.name) || prev : null));
         }
       }
-
       if (workflowsRes.ok) {
         const workflowsData = await workflowsRes.json();
         if (Array.isArray(workflowsData.workflows)) {
           setWorkflows(workflowsData.workflows);
+          setSelectedWorkflow((prev) => (prev ? workflowsData.workflows.find((w: WorkflowManifest) => w.id === prev.id) || prev : null));
         }
       }
-
       setIsConnected(true);
     } catch {
       setIsConnected(false);
@@ -69,17 +74,31 @@ export default function App(): React.ReactElement {
     fetchInventory();
   }, [fetchInventory]);
 
+  const {
+    flash,
+    setFlash,
+    handleCentralizeSkill,
+    handleRevertSkill,
+    handleBatchCentralize,
+    handleBatchRevert,
+    handleCentralizeWorkflow,
+    handleRevertWorkflow,
+    handleCentralizeMcp,
+    handleToggleMcp,
+    handleGenerateMcpSubset,
+    handleQueryMcpTools,
+  } = useInventoryActions(fetchInventory, {
+    setSelectedSkill,
+    setSelectedWorkflow,
+    setSelectedMcp,
+  });
+
   return (
     <div className="App">
-      {/* Cockpit Header */}
       <header className="App-header">
         <div className="App-header-brand">
           <a href="/" className="App-header-brand-link">
-            <img
-              src="/logo.png"
-              alt="KoSkill Logo"
-              style={{ width: '28px', height: '28px', objectFit: 'contain' }}
-            />
+            <img src="/logo.png" alt="KoSkill Logo" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
             <span className="App-header-title">KoSkill</span>
           </a>
           <span className="App-header-tag">v0.1.0</span>
@@ -90,7 +109,7 @@ export default function App(): React.ReactElement {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '4px',
-              marginLeft: '8px'
+              marginLeft: '8px',
             }}
           >
             ● {isConnected ? 'Connected to 127.0.0.1:3900' : 'Offline'}
@@ -103,40 +122,56 @@ export default function App(): React.ReactElement {
             className="Btn"
             onClick={fetchInventory}
             disabled={isRefreshing}
-            aria-label="Refresh inventory"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            {isRefreshing ? 'Scanning...' : 'Refresh Discovery'}
           </button>
           <button
             type="button"
-            className="Btn"
+            className="Theme-toggle"
             onClick={toggleTheme}
-            aria-label="Theme toggle"
+            aria-label="Toggle Theme"
           >
             Theme: {colorMode === 'light' ? 'Light' : 'Dark'}
-          </button>
-          <button type="button" className="Btn Btn-primary">
-            + Add Skill
           </button>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="Container">
+      <main className="App-main" style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 16px' }}>
+        {flash && (
+          <FlashNotification
+            message={flash.message}
+            type={flash.type}
+            onDismiss={() => setFlash(null)}
+            autoCloseMs={5000}
+          />
+        )}
+
         {selectedSkill ? (
           <SkillDetailView
             skill={selectedSkill}
             onBack={() => setSelectedSkill(null)}
+            onCentralizeSkill={handleCentralizeSkill}
+            onRevertSkill={handleRevertSkill}
           />
         ) : selectedWorkflow ? (
           <WorkflowDetailView
             workflow={selectedWorkflow}
             onBack={() => setSelectedWorkflow(null)}
+            onCentralizeWorkflow={handleCentralizeWorkflow}
+            onRevertWorkflow={handleRevertWorkflow}
+          />
+        ) : selectedMcp ? (
+          <McpDetailView
+            server={selectedMcp}
+            onBack={() => setSelectedMcp(null)}
+            onToggleEnabled={handleToggleMcp}
+            onCentralize={handleCentralizeMcp}
+            onQueryTools={handleQueryMcpTools}
           />
         ) : (
           <>
-            {/* Underline Navigation */}
-            <nav className="UnderlineNav" aria-label="Dashboard Navigation">
+            <nav className="UnderlineNav" aria-label="Ecosystem Views" style={{ marginBottom: '20px' }}>
               <button
                 type="button"
                 className={`UnderlineNav-item ${activeTab === 'skills' ? 'selected' : ''}`}
@@ -174,47 +209,33 @@ export default function App(): React.ReactElement {
               </button>
             </nav>
 
-            {/* Tab Panels */}
             {activeTab === 'skills' && (
               <DiscoveryTable
                 skills={skills}
                 onSelectSkill={(skill) => setSelectedSkill(skill)}
+                onCentralizeSkill={handleCentralizeSkill}
+                onRevertSkill={handleRevertSkill}
+                onBatchCentralize={handleBatchCentralize}
+                onBatchRevert={handleBatchRevert}
               />
             )}
-
             {activeTab === 'workflows' && (
               <DiscoveryTable
                 workflows={workflows}
                 onSelectWorkflow={(wf) => setSelectedWorkflow(wf)}
+                onCentralizeWorkflow={handleCentralizeWorkflow}
+                onRevertWorkflow={handleRevertWorkflow}
               />
             )}
-
             {activeTab === 'mcp' && (
-              <div className="Box">
-                <div className="Box-header">
-                  <span className="Box-title">Active Model Context Protocol Servers</span>
-                  <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
-                    {mcpServers.length} servers configured
-                  </span>
-                </div>
-                {mcpServers.map((mcp) => (
-                  <div key={mcp.id} className="Box-row">
-                    <div>
-                      <div style={{ fontWeight: 600, color: 'var(--color-accent-fg)', marginBottom: '4px' }}>
-                        {mcp.name}
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
-                        Transport: {mcp.transport} | Command: <code>{mcp.command}</code>
-                      </div>
-                    </div>
-                    <div>
-                      <span className="Label Label--accent">{mcp.declaredToolsCount} tools</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <McpServerList
+                servers={mcpServers}
+                onSelectServer={(server) => setSelectedMcp(server)}
+                onGenerateSubset={handleGenerateMcpSubset}
+                onToggleEnabled={handleToggleMcp}
+                onCentralizeServer={handleCentralizeMcp}
+              />
             )}
-
             {activeTab === 'conflicts' && (
               <div className="Box">
                 <div className="Box-header">
@@ -225,21 +246,16 @@ export default function App(): React.ReactElement {
                 </div>
               </div>
             )}
-
             {activeTab === 'settings' && (
               <div className="Box">
                 <div className="Box-header">
                   <span className="Box-title">Workspace Configuration</span>
                 </div>
                 <div className="Box-row">
-                  <div>
-                    <strong>Global Config Root:</strong> <code>~/.gemini/config</code>
-                  </div>
+                  <div><strong>Global Config Root:</strong> <code>~/.gemini/config</code></div>
                 </div>
                 <div className="Box-row">
-                  <div>
-                    <strong>Storage Root:</strong> <code>~/.koskill/storage</code>
-                  </div>
+                  <div><strong>Storage Root:</strong> <code>~/.koskill/skills</code></div>
                 </div>
               </div>
             )}

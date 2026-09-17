@@ -81,9 +81,8 @@ flowchart LR
 - **Central Storage & Symlinking**: Consolidate scattered configurations into `~/.koskill/` and manage symlinks to target environments transparently. User can pick and choose which one they want to leave in the original config or move / symlink to ~/.koskill
 - **Embedded Hybrid Search**: Sub-30ms similarity scoring and lexical search combining `sqlite-vec` dense embeddings and SQLite FTS5 BM25 with Reciprocal Rank Fusion (RRF) at `~/.koskill/cache/index.db`.
 - **Local ONNX Embeddings**: Zero-cloud inference using `@xenova/transformers` (384 dimensions) with lazy loading to guarantee sub-200ms cold starts.
-- **Semantic Conflict & Collision Detection**: Detect semantically identical skills with different titles (cosine similarity >= 0.85) and identify prompt instruction collisions for shared command triggers.
-- **Conflict & Duplicate Detection**: Identify conflicting instructions, duplicate MCP tools, and name collisions across ecosystems.
-- **Resolution Workflows**: Interactively choose preferred definitions, set workspace overrides, or merge complementary configs.
+- **Tiered Conflict & Deduplication Engine**: Detect exact name collisions, identical SHA-256 CAS content hashes, colliding MCP tool signatures across servers, semantic duplicates (cosine similarity >= 0.85), and prompt instruction divergences on shared command triggers.
+- **Side-by-Side Diff & Resolution UI**: Compare conflicting `SKILL.md` instructions with unified line diffs, similarity match badges (e.g. "94% Match"), and execute atomic `PICK` (keep winner, archive loser), `ALIAS` (rename), or `MERGE` (combine configs) actions with optimistic CAS hash validation and pre-resolution snapshot backups.
 - **Instant Activation Toggles**: Enable or disable specific skills and MCP servers globally or on a per-project basis with a single click.
 - **Backup & Migration**: Export your curated skill set and restore it on new development machines effortlessly.
 - **Credential & API Key Safety**: Manage sensitive API keys and tokens in a secure local vault rather than spreading them across plain text files.

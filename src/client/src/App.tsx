@@ -3,18 +3,19 @@ import './index.css';
 import { SkillManifest, McpServerManifest, WorkflowManifest } from '../../core/types.js';
 import { ConflictReport, ResolutionPayload } from '../../core/conflict/types.js';
 import { DiscoveryTable } from './components/DiscoveryTable.js';
-import { SkillDetailView } from './components/SkillDetailView.js';
-import { WorkflowDetailView } from './components/WorkflowDetailView.js';
-import { McpDetailView } from './components/McpDetailView.js';
 import { FlashNotification } from './components/FlashNotification.js';
 import { McpServerList } from './components/McpServerList.js';
 import { AppHeader } from './components/AppHeader.js';
 import { ConflictList } from './components/ConflictList.js';
 import { ConflictModal } from './components/ConflictModal.js';
+import { AppDetailViews } from './components/AppDetailViews.js';
+import { BackupModal } from './components/BackupModal.js';
+import { VaultDrawer } from './components/VaultDrawer.js';
+import { SettingsView } from './components/SettingsView.js';
+import { AppTabNavigation, Tab } from './components/AppTabNavigation.js';
 import { initialSkills, initialMcp, initialWorkflows } from './mockData.js';
 import { useInventoryActions } from './hooks/useInventoryActions.js';
-
-type Tab = 'skills' | 'workflows' | 'mcp' | 'conflicts' | 'settings';
+import { useBackupAndVault } from './hooks/useBackupAndVault.js';
 
 export default function App(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<Tab>('skills');
@@ -108,6 +109,23 @@ export default function App(): React.ReactElement {
     setSelectedMcp,
   });
 
+  const {
+    isBackupOpen,
+    setIsBackupOpen,
+    isVaultOpen,
+    setIsVaultOpen,
+    vaultSecrets,
+    fetchSecrets,
+    isProcessing: isBackupProcessing,
+    backupError,
+    backupSuccess,
+    vaultError,
+    vaultSuccess,
+    handleExportBackup,
+    handleImportBackup,
+    handleSaveSecret,
+  } = useBackupAndVault(fetchInventory);
+
   const handleResolveConflict = async (payload: ResolutionPayload) => {
     try {
       const res = await fetch('/api/conflicts/resolve', {
@@ -128,6 +146,8 @@ export default function App(): React.ReactElement {
     }
   };
 
+  const hasDetailSelected = Boolean(selectedSkill || selectedWorkflow || selectedMcp);
+
   return (
     <div className="App">
       <AppHeader
@@ -136,6 +156,11 @@ export default function App(): React.ReactElement {
         colorMode={colorMode}
         onRefresh={fetchInventory}
         onToggleTheme={toggleTheme}
+        onOpenBackup={() => setIsBackupOpen(true)}
+        onOpenVault={() => {
+          setIsVaultOpen(true);
+          fetchSecrets();
+        }}
       />
 
       <main className="App-main" style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 16px' }}>
@@ -148,78 +173,35 @@ export default function App(): React.ReactElement {
           />
         )}
 
-        {selectedSkill ? (
-          <SkillDetailView
-            skill={selectedSkill}
-            onBack={() => setSelectedSkill(null)}
+        {hasDetailSelected ? (
+          <AppDetailViews
+            selectedSkill={selectedSkill}
+            selectedWorkflow={selectedWorkflow}
+            selectedMcp={selectedMcp}
+            onClearSelection={() => {
+              setSelectedSkill(null);
+              setSelectedWorkflow(null);
+              setSelectedMcp(null);
+            }}
             onCentralizeSkill={handleCentralizeSkill}
             onRevertSkill={handleRevertSkill}
-          />
-        ) : selectedWorkflow ? (
-          <WorkflowDetailView
-            workflow={selectedWorkflow}
-            onBack={() => setSelectedWorkflow(null)}
             onCentralizeWorkflow={handleCentralizeWorkflow}
             onRevertWorkflow={handleRevertWorkflow}
-          />
-        ) : selectedMcp ? (
-          <McpDetailView
-            server={selectedMcp}
-            onBack={() => setSelectedMcp(null)}
-            onToggleEnabled={handleToggleMcp}
-            onCentralize={handleCentralizeMcp}
+            onToggleMcp={handleToggleMcp}
+            onCentralizeMcp={handleCentralizeMcp}
             onQueryTools={handleQueryMcpTools}
-            onDiscoverServer={handleDiscoverMcp}
+            onDiscoverMcp={handleDiscoverMcp}
           />
         ) : (
           <>
-            <nav className="UnderlineNav" aria-label="Ecosystem Views" style={{ marginBottom: '20px' }}>
-              <button
-                type="button"
-                className={`UnderlineNav-item ${activeTab === 'skills' ? 'selected' : ''}`}
-                onClick={() => setActiveTab('skills')}
-              >
-                Skills <span className="Counter">{skills.length}</span>
-              </button>
-              <button
-                type="button"
-                className={`UnderlineNav-item ${activeTab === 'workflows' ? 'selected' : ''}`}
-                onClick={() => setActiveTab('workflows')}
-              >
-                Workflows <span className="Counter">{workflows.length}</span>
-              </button>
-              <button
-                type="button"
-                className={`UnderlineNav-item ${activeTab === 'mcp' ? 'selected' : ''}`}
-                onClick={() => setActiveTab('mcp')}
-              >
-                MCP Servers <span className="Counter">{mcpServers.length}</span>
-              </button>
-              <button
-                type="button"
-                className={`UnderlineNav-item ${activeTab === 'conflicts' ? 'selected' : ''}`}
-                onClick={() => setActiveTab('conflicts')}
-              >
-                Conflicts{' '}
-                <span
-                  className="Counter"
-                  style={
-                    conflicts.length > 0
-                      ? { backgroundColor: 'var(--color-danger-fg)', color: '#fff' }
-                      : undefined
-                  }
-                >
-                  {conflicts.length}
-                </span>
-              </button>
-              <button
-                type="button"
-                className={`UnderlineNav-item ${activeTab === 'settings' ? 'selected' : ''}`}
-                onClick={() => setActiveTab('settings')}
-              >
-                Settings
-              </button>
-            </nav>
+            <AppTabNavigation
+              activeTab={activeTab}
+              onSelectTab={setActiveTab}
+              skillsCount={skills.length}
+              workflowsCount={workflows.length}
+              mcpCount={mcpServers.length}
+              conflictsCount={conflicts.length}
+            />
 
             {activeTab === 'skills' && (
               <DiscoveryTable
@@ -256,17 +238,13 @@ export default function App(): React.ReactElement {
               />
             )}
             {activeTab === 'settings' && (
-              <div className="Box">
-                <div className="Box-header">
-                  <span className="Box-title">Workspace Configuration</span>
-                </div>
-                <div className="Box-row">
-                  <div><strong>Global Config Root:</strong> <code>~/.gemini/config</code></div>
-                </div>
-                <div className="Box-row">
-                  <div><strong>Storage Root:</strong> <code>~/.koskill/skills</code></div>
-                </div>
-              </div>
+              <SettingsView
+                onOpenBackup={() => setIsBackupOpen(true)}
+                onOpenVault={() => {
+                  setIsVaultOpen(true);
+                  fetchSecrets();
+                }}
+              />
             )}
           </>
         )}
@@ -278,6 +256,25 @@ export default function App(): React.ReactElement {
             onResolve={handleResolveConflict}
           />
         )}
+
+        <BackupModal
+          isOpen={isBackupOpen}
+          onClose={() => setIsBackupOpen(false)}
+          onExport={handleExportBackup}
+          onImport={handleImportBackup}
+          isProcessing={isBackupProcessing}
+          errorMessage={backupError}
+          successMessage={backupSuccess}
+        />
+
+        <VaultDrawer
+          isOpen={isVaultOpen}
+          secrets={vaultSecrets}
+          onClose={() => setIsVaultOpen(false)}
+          onSaveSecret={handleSaveSecret}
+          errorMessage={vaultError}
+          successMessage={vaultSuccess}
+        />
       </main>
     </div>
   );

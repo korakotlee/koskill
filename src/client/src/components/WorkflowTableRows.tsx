@@ -2,12 +2,14 @@ import React from 'react';
 import { WorkflowManifest } from '../../../core/types.js';
 import { StorageStatusBadge } from './StorageStatusBadge.js';
 import { SymlinkActions } from './SymlinkActions.js';
+import { EntityToggleSwitch } from './EntityToggleSwitch.js';
 
 export interface WorkflowTableRowsProps {
   workflows: WorkflowManifest[];
   onSelectWorkflow?: (workflow: WorkflowManifest) => void;
   onCentralizeWorkflow?: (workflow: WorkflowManifest) => void;
   onRevertWorkflow?: (workflow: WorkflowManifest) => void;
+  onToggleWorkflow?: (workflow: WorkflowManifest, enabled: boolean) => void;
 }
 
 /**
@@ -18,6 +20,7 @@ export const WorkflowTableRows: React.FC<WorkflowTableRowsProps> = ({
   onSelectWorkflow,
   onCentralizeWorkflow,
   onRevertWorkflow,
+  onToggleWorkflow,
 }) => {
   return (
     <>
@@ -50,6 +53,12 @@ export const WorkflowTableRows: React.FC<WorkflowTableRowsProps> = ({
                 </button>
                 <span className={badgeClass}>{workflow.targetEcosystem}</span>
                 <StorageStatusBadge status={workflow.status || 'original'} />
+                <EntityToggleSwitch
+                  entityType="workflows"
+                  id={workflow.name}
+                  enabled={workflow.status !== 'inactive'}
+                  onToggle={(targetState) => onToggleWorkflow?.(workflow, targetState)}
+                />
                 <span className="Label Label--secondary">{workflow.scope}</span>
                 {workflow.metadata?.argumentHint && (
                   <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)', fontFamily: 'monospace' }}>

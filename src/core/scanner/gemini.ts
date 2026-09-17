@@ -2,6 +2,11 @@ import fs from 'fs/promises';
 import path from 'path';
 import { SkillManifest, McpServerManifest } from '../types.js';
 import { defaultLogger } from '../logger.js';
+import { getSkillStorageStatus } from '../storage/symlink-manager.js';
+
+export interface ScanSkillsOptions {
+  customHome?: string;
+}
 
 /**
  * Extracts basic YAML frontmatter key-value pairs from markdown content.
@@ -42,16 +47,36 @@ export function extractFrontmatter(content: string): {
  * Scans a directory for Gemini skill packages containing SKILL.md.
  *
  * @param skillsDirectory Directory containing skill subdirectories
+ * @param options Optional scan options including custom home override
  */
-export async function scanGeminiSkills(skillsDirectory: string): Promise<SkillManifest[]> {
+export async function scanGeminiSkills(
+  skillsDirectory: string,
+  options?: ScanSkillsOptions
+): Promise<SkillManifest[]> {
   try {
     const entries = await fs.readdir(skillsDirectory, { withFileTypes: true });
     const skills: SkillManifest[] = [];
 
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
+      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
 
-      const skillPath = path.join(skillsDirectory, entry.name, 'SKILL.md');
+      const skillDir = path.join(skillsDirectory, entry.name);
+      const storageInspection = await getSkillStorageStatus(skillDir, options?.customHome);
+
+      if (storageInspection.status === 'broken-link') {
+        skills.push({
+          id: `gemini:${entry.name}`,
+          name: entry.name,
+          description: 'Broken symbolic link destination missing',
+          sourcePath: skillDir,
+          targetEcosystem: 'gemini',
+          status: 'broken-link',
+          targetPath: storageInspection.targetPath,
+        });
+        continue;
+      }
+
+      const skillPath = path.join(skillDir, 'SKILL.md');
       try {
         const rawContent = await fs.readFile(skillPath, 'utf-8');
         const { attributes, body } = extractFrontmatter(rawContent);
@@ -70,9 +95,10 @@ export async function scanGeminiSkills(skillsDirectory: string): Promise<SkillMa
           description,
           sourcePath: skillPath,
           targetEcosystem: 'gemini',
-          status: 'original',
+          status: storageInspection.status,
+          targetPath: storageInspection.targetPath,
           metadata: { ...attributes },
-          rawContent
+          rawContent,
         });
       } catch (err: any) {
         if (err.code !== 'ENOENT') {

@@ -73,6 +73,7 @@ export class Logger {
 }
 
 export const defaultLogger = new Logger();
+export const logger = defaultLogger;
 
 /**
  * Common timestamped debug log method callable from anywhere in the codebase.

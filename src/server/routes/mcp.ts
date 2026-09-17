@@ -9,6 +9,7 @@ import {
   updateServerTools,
 } from '../../core/storage/mcp-store.js';
 import { queryMcpServerTools } from '../../core/mcp/mcp-client.js';
+import { defaultDiscoveryService } from '../services/mcp-discovery-service.js';
 import { defaultLogger } from '../../core/logger.js';
 import { McpServerManifest } from '../../core/types.js';
 
@@ -62,10 +63,16 @@ export async function handleMcpRoutes(
 
         mergedServers.push({
           ...scanned,
+          title: registered?.title || scanned.title,
+          version: registered?.version || scanned.version,
+          description: registered?.description || scanned.description,
+          instructions: registered?.instructions || scanned.instructions,
+          serverInfo: registered?.serverInfo || scanned.serverInfo,
           status: registered ? 'centralized' : 'original',
           enabled: registered ? registered.enabled !== false : true,
           tools,
           declaredToolsCount: tools.length > 0 ? tools.length : scanned.declaredToolsCount,
+          lastDiscoveredAt: registered?.lastDiscoveredAt || scanned.lastDiscoveredAt,
         });
       }
 
@@ -111,10 +118,16 @@ export async function handleMcpRoutes(
 
       const server: McpServerManifest = {
         ...base,
+        title: registered?.title || scanned?.title || base.title,
+        version: registered?.version || scanned?.version || base.version,
+        description: registered?.description || scanned?.description || base.description,
+        instructions: registered?.instructions || scanned?.instructions || base.instructions,
+        serverInfo: registered?.serverInfo || scanned?.serverInfo || base.serverInfo,
         status: registered ? 'centralized' : 'original',
         enabled: registered ? registered.enabled !== false : true,
         tools,
         declaredToolsCount: tools.length > 0 ? tools.length : base.declaredToolsCount,
+        lastDiscoveredAt: registered?.lastDiscoveredAt || scanned?.lastDiscoveredAt || base.lastDiscoveredAt,
       };
 
       res.writeHead(200);
@@ -234,6 +247,36 @@ export async function handleMcpRoutes(
     } catch (err: any) {
       defaultLogger.error('Failed to query MCP server tools', { serverName, error: err.message });
       res.writeHead(500);
+      res.end(JSON.stringify({ error: err.message }));
+      return true;
+    }
+  }
+
+  // POST /api/mcp/discover-all
+  if (req.method === 'POST' && url.pathname === '/api/mcp/discover-all') {
+    try {
+      const result = await defaultDiscoveryService.discoverAllServers();
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, ...result }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: err.message }));
+      return true;
+    }
+  }
+
+  // POST /api/mcp/:name/discover
+  if (req.method === 'POST' && url.pathname.startsWith('/api/mcp/') && url.pathname.endsWith('/discover')) {
+    const serverName = decodeURIComponent(url.pathname.slice('/api/mcp/'.length, -('/discover'.length)));
+    try {
+      const server = await defaultDiscoveryService.discoverServer(serverName);
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, server }));
+      return true;
+    } catch (err: any) {
+      const status = err.message.includes('not found') ? 404 : 500;
+      res.writeHead(status);
       res.end(JSON.stringify({ error: err.message }));
       return true;
     }

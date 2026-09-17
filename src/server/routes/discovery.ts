@@ -69,24 +69,6 @@ export async function handleDiscoveryRoutes(
     }
   }
 
-  // GET /api/mcp
-  if (url.pathname === '/api/mcp') {
-    try {
-      const inventory = await scanAllInventory();
-      res.writeHead(200);
-      res.end(JSON.stringify({
-        servers: inventory.mcpServers,
-        total: inventory.totalMcpServers
-      }));
-      return true;
-    } catch (err: any) {
-      defaultLogger.error('Failed to handle /api/mcp', { error: err.message });
-      res.writeHead(500);
-      res.end(JSON.stringify({ error: 'Internal Server Error', message: err.message }));
-      return true;
-    }
-  }
-
   // GET /api/workflows
   if (url.pathname === '/api/workflows') {
     try {

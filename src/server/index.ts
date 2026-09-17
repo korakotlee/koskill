@@ -1,6 +1,9 @@
 import http from 'http';
 import { defaultLogger } from '../core/logger.js';
 import { handleDiscoveryRoutes } from './routes/discovery.js';
+import { handleStorageRoutes } from './routes/storage.js';
+import { handleWorkflowStorageRoutes } from './routes/workflow-storage.js';
+import { handleMcpRoutes } from './routes/mcp.js';
 
 export interface AppServer {
   server: http.Server;
@@ -43,10 +46,19 @@ export async function startServer(preferredPort?: number): Promise<AppServer> {
       return;
     }
 
-    // Discovery routes
+    // Discovery and storage routes
     try {
       const handled = await handleDiscoveryRoutes(req, res, url);
       if (handled) return;
+
+      const storageHandled = await handleStorageRoutes(req, res, url);
+      if (storageHandled) return;
+
+      const workflowHandled = await handleWorkflowStorageRoutes(req, res, url);
+      if (workflowHandled) return;
+
+      const mcpHandled = await handleMcpRoutes(req, res, url);
+      if (mcpHandled) return;
     } catch (err: any) {
       defaultLogger.error('Unhandled router error', { error: err.message, path: url.pathname });
       res.writeHead(500);

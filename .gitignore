@@ -9,6 +9,7 @@ build/
 out/
 *.tsbuildinfo
 .vite/
+agents_mcp/
 
 # Local Environment & Secrets
 .env

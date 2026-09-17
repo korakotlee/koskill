@@ -100,18 +100,44 @@ The Node.js HTTP server binds strictly to `127.0.0.1:3900`:
 - `GET /api/mcp`: Returns array of normalized `McpServerManifest` records and total count.
 - `GET /api/workflows`: Returns array of normalized `WorkflowManifest` records and total count.
 - `GET /api/workflows/:id`: Returns specific workflow record including `rawContent`, command trigger, argument hint, and tool permissions. Returns 404 if not found.
+- `POST /api/skills/:id/centralize`: Migrates a skill directory into `~/.koskill/skills/<name>` and replaces the original directory with a symbolic link.
+- `POST /api/skills/:id/revert`: Removes the symbolic link and restores physical skill files back to the original source location.
+- `POST /api/skills/batch/centralize`: Accepts `{ skillIds: string[] }` and executes sequential centralization with atomic rollback per item.
+- `POST /api/skills/batch/revert`: Accepts `{ skillIds: string[] }` and executes sequential reversion with error isolation.
+- `POST /api/workflows/:id/centralize`: Migrates a standalone workflow markdown file into `~/.koskill/workflows/<name>.md` and creates a symlink in its place.
+- `POST /api/workflows/:id/revert`: Reverts a centralized workflow symlink back to a standalone local markdown file.
+- `POST /api/workflows/batch/centralize`: Accepts `{ workflowIds: string[] }` and centralizes multiple workflows sequentially.
+- `POST /api/mcp/:name/centralize`: Registers an MCP server into `~/.koskill/mcp/servers.json`.
+- `POST /api/mcp/:name/toggle`: Toggles the enabled state of an MCP server (`{ enabled: boolean }`).
+- `POST /api/mcp/:name/query-tools`: Connects to an MCP server process over stdio via JSON-RPC 2.0 (`initialize` + `tools/list`), discovers available tools, updates `declaredToolsCount`, and caches them in `~/.koskill/mcp/servers.json`.
+- `POST /api/mcp/generate-subset`: Generates `agents_mcp/servers.json` containing only enabled MCP servers.
 
 ---
 
-## 5. Frontend Presentation & Views
+## 5. Central Storage, Symlink Managers & MCP Client
+
+The core system manages the `~/.koskill/` hierarchy and active runtime communication:
+
+- **MCP Query Client (`mcp-client.ts`)**: Spawns local MCP server commands over stdio, conducts JSON-RPC 2.0 protocol handshakes (`initialize`, `notifications/initialized`, `tools/list`), and parses tools with a configurable safety timeout.
+- **Store Coordinator (`store.ts`)**: Idempotently initializes `~/.koskill/skills/`, `~/.koskill/workflows/`, and `~/.koskill/mcp/` directories with safe permissions.
+- **Skill Symlink Manager (`symlink-manager.ts`)**: Executes two-phase copy, backup, atomic symlink generation, and reversible rollback routines for directory-based skill migrations.
+- **Workflow Symlink Manager (`workflow-symlink-manager.ts`)**: Executes atomic migration and symlinking for standalone workflow `.md` files.
+- **MCP Registry Store (`mcp-store.ts`)**: Maintains canonical server declarations in `~/.koskill/mcp/servers.json`, supports server activation toggling, tool schema caching (`updateServerTools`), and exports subsets into `agents_mcp/servers.json`.
+- **Transaction Journal (`journal.ts`)**: Appends atomic transaction records to `~/.koskill/journal.json` with status tracking (`COMPLETED`, `FAILED`, `ROLLED_BACK`).
+
+---
+
+## 6. Frontend Presentation & Views
 
 The React client adopts the GitHub Primer design system:
 
 - **Dashboard Shell (`App.tsx`)**: Header status indicator (`● Connected to 127.0.0.1:3900`), manual refresh action, light/dark theme toggle, and UnderlineNav tabs (Skills, Workflows, MCP Servers, Conflicts, Settings).
-- **Discovery Table (`DiscoveryTable.tsx`)**: Instant client-side filtering across skill and workflow names, commands, ecosystems, and paths, with badge indicators (`Label--accent` for Gemini, `Label--done` for Claude, `Label--secondary` for scope).
-- **Skill Detail View (`SkillDetailView.tsx`)**: Dedicated inspection view featuring `← Back to Discovery` breadcrumb navigation, two-column responsive layout, and metadata summary card.
-- **Workflow Detail View (`WorkflowDetailView.tsx`)**: Dedicated inspection view featuring invocation syntax display, argument hints, tool permission badges, and raw prompt instruction panel.
-- **Markdown Viewer (`MarkdownViewer.tsx`)**: Primer README-style container rendering `SKILL.md` and workflow markdown via `marked`.
+- **Discovery Table (`DiscoveryTable.tsx`)**: Instant client-side filtering across skill and workflow names, commands, ecosystems, and paths, with badge indicators and multi-select centralization toolbars.
+- **Skill Detail View (`SkillDetailView.tsx`)**: Dedicated inspection view featuring `← Back to Discovery` breadcrumb navigation, two-column responsive layout, and metadata summary card with bold frontmatter formatting.
+- **Workflow Detail View (`WorkflowDetailView.tsx`)**: Dedicated inspection view featuring invocation syntax display, argument hints, tool permission badges, Centralize/Revert action triggers, and raw prompt instruction panel.
+- **MCP Server List (`McpServerList.tsx`)**: Inventory of configured MCP servers with status badges, activation toggle buttons, and an action bar to generate `agents_mcp/servers.json`.
+- **MCP Detail View (`McpDetailView.tsx`)**: Dedicated inspection view featuring tool capability tables (bold tool names, normal descriptions), runtime command/args, transport type, and environment configuration. Automatically queries active MCP servers with 0 cached tools and offers manual "Refresh Tools" triggers.
+- **Markdown Viewer (`MarkdownViewer.tsx`)**: Primer README-style container rendering `SKILL.md` and workflow markdown via `marked`, featuring clean frontmatter extraction and bold key/normal text styling.
 
 
 ---

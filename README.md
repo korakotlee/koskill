@@ -109,10 +109,11 @@ koskill/
 ├── src/                       # Source codebase
 │   ├── core/                  # Core domain models, contracts, and logger
 │   │   ├── scanner/           # Discovery scanner for Gemini and Claude
+│   │   ├── storage/           # Central store, symlink manager, and journal
 │   │   ├── logger.ts          # Centralized structured logger
 │   │   └── types.ts           # Shared domain types and type guards
 │   ├── server/                # Node.js HTTP daemon
-│   │   ├── routes/            # REST API route handlers
+│   │   ├── routes/            # REST API route handlers (discovery, storage)
 │   │   └── index.ts           # Server entrypoint and health route
 │   └── client/                # Vite + React frontend dashboard
 │       ├── index.html         # Frontend HTML entrypoint

@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import { WorkflowManifest, WorkflowScope, WorkflowMetadata } from '../types.js';
 import { defaultLogger } from '../logger.js';
+import { inspectWorkflowStorage } from '../storage/workflow-symlink-manager.js';
 
 /**
  * Options for configuring workflow discovery paths.
@@ -119,7 +120,7 @@ export async function scanGeminiWorkflows(
     const workflows: WorkflowManifest[] = [];
 
     for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+      if ((!entry.isFile() && !entry.isSymbolicLink()) || !entry.name.endsWith('.md')) continue;
 
       const filePath = path.join(directory, entry.name);
       try {
@@ -130,6 +131,7 @@ export async function scanGeminiWorkflows(
         const name = attributes.name || baseName;
         const description = attributes.description || extractFallbackDescription(body);
         const command = `/${name}`;
+        const storage = await inspectWorkflowStorage(filePath);
 
         workflows.push({
           id: `gemini:${name}`,
@@ -139,6 +141,8 @@ export async function scanGeminiWorkflows(
           sourcePath: filePath,
           targetEcosystem: 'gemini',
           scope,
+          status: storage.status,
+          targetPath: storage.targetPath,
           metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
           rawContent
         });
@@ -173,7 +177,7 @@ export async function scanClaudeCommands(
     const workflows: WorkflowManifest[] = [];
 
     for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+      if ((!entry.isFile() && !entry.isSymbolicLink()) || !entry.name.endsWith('.md')) continue;
 
       const filePath = path.join(directory, entry.name);
       try {
@@ -184,6 +188,7 @@ export async function scanClaudeCommands(
         const name = attributes.name || baseName;
         const description = attributes.description || extractFallbackDescription(body);
         const command = `/${name}`;
+        const storage = await inspectWorkflowStorage(filePath);
 
         workflows.push({
           id: `claude:${name}`,
@@ -193,6 +198,8 @@ export async function scanClaudeCommands(
           sourcePath: filePath,
           targetEcosystem: 'claude',
           scope,
+          status: storage.status,
+          targetPath: storage.targetPath,
           metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
           rawContent
         });

@@ -6,7 +6,7 @@ export type ConfigTarget = 'gemini' | 'claude' | 'codex';
 /**
  * Synchronization lifecycle status for a skill.
  */
-export type SkillStatus = 'original' | 'centralized' | 'symlinked' | 'inactive';
+export type SkillStatus = 'original' | 'centralized' | 'symlinked' | 'broken-link' | 'inactive';
 
 /**
  * Metadata definition for a registered skill in KoSkill.
@@ -18,6 +18,7 @@ export interface SkillManifest {
   sourcePath: string;
   targetEcosystem: ConfigTarget;
   status: SkillStatus;
+  targetPath?: string;
   metadata?: Record<string, unknown>;
   rawContent?: string;
 }
@@ -26,6 +27,15 @@ export interface SkillManifest {
  * Supported transport mechanisms for Model Context Protocol (MCP) servers.
  */
 export type McpTransport = 'stdio' | 'sse';
+
+/**
+ * Definition of a single tool exposed by an MCP server.
+ */
+export interface McpToolDefinition {
+  name: string;
+  description?: string;
+  parameters?: Record<string, unknown>;
+}
 
 /**
  * Configuration declaration for an MCP server instance.
@@ -38,6 +48,10 @@ export interface McpServerManifest {
   args: string[];
   env?: Record<string, string>;
   declaredToolsCount: number;
+  tools?: McpToolDefinition[];
+  enabled?: boolean;
+  status?: SkillStatus;
+  sourceConfigPath?: string;
 }
 
 /**
@@ -61,7 +75,7 @@ export function isValidSkillManifest(item: unknown): item is SkillManifest {
     typeof s.name === 'string' && s.name.trim().length > 0 &&
     typeof s.sourcePath === 'string' &&
     ['gemini', 'claude', 'codex'].includes(s.targetEcosystem as string) &&
-    ['original', 'centralized', 'symlinked', 'inactive'].includes(s.status as string)
+    ['original', 'centralized', 'symlinked', 'broken-link', 'inactive'].includes(s.status as string)
   );
 }
 
@@ -107,6 +121,8 @@ export interface WorkflowManifest {
   sourcePath: string;
   targetEcosystem: ConfigTarget;
   scope: WorkflowScope;
+  status?: SkillStatus;
+  targetPath?: string;
   metadata?: WorkflowMetadata;
   rawContent?: string;
 }

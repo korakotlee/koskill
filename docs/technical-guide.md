@@ -115,8 +115,10 @@ The Node.js HTTP server binds strictly to `127.0.0.1:3900`:
 - `POST /api/mcp/:name/discover`: Proactively probes an MCP server over stdio using `server/discover` (with fallback to `initialize` and local `instructions.md`), extracting title, version, description, instructions, and tools.
 - `POST /api/mcp/discover-all`: Probes all active MCP servers in batch with concurrency pooling, persisting enriched metadata in the central registry.
 - `POST /api/mcp/generate-subset`: Generates `agents_mcp/servers.json` containing only enabled MCP servers.
-- `GET /api/search/query`: Executes hybrid vector + lexical search queries (`?q=<query>&limit=<n>&itemType=<type>&ecosystem=<eco>`) returning RRF-ranked results.
+- [x] `GET /api/search/query`: Executes hybrid vector + lexical search queries (`?q=<query>&limit=<n>&itemType=<type>&ecosystem=<eco>`) returning RRF-ranked results.
 - `POST /api/search/reindex`: Triggers incremental re-indexing of all discovered skills and workflows into `~/.koskill/cache/index.db`.
+- `GET /api/conflicts`: Executes tiered conflict detection (exact name/hash, semantic duplicate, command divergence, MCP tools) and returns structured conflict reports.
+- `POST /api/conflicts/resolve`: Executes atomic conflict resolution (`PICK`, `ALIAS`, `MERGE`) with optimistic CAS hash checks and pre-resolution archiving.
 
 ---
 
@@ -145,6 +147,9 @@ The hybrid search layer provides embedded vector and lexical search capabilities
   $$RRF(d) = \sum_{m \in \{vec, fts\}} \frac{1}{k + rank_m(d)} \quad (k=60)$$
 - **Semantic Conflict Detector (`semantic.ts`)**: Evaluates vector similarity across skills to detect functional duplicates with differing titles (cosine similarity >= 0.85) and flags prompt instruction collisions for shared command triggers.
 - **Capability Router (`routeCapabilities`)**: Discovers and ranks top-K relevant skills and workflows matching user queries in under 30ms.
+- **Tiered Conflict Engine (`detector.ts`, `semantic.ts`)**: Executes Tier 1 exact name and content hash checks, Tier 2 semantic duplicate checks, Tier 3 command instruction divergence checks, and MCP tool collisions across all servers.
+- **Unified Diff Generator (`diff.ts`)**: Line-based LCS diff algorithm computing line additions, deletions, context blocks, and unified diff output.
+- **Atomic Conflict Resolver (`resolver.ts`)**: Implements safe `PICK`, `ALIAS`, and `MERGE` actions with optimistic CAS hash validation (`E_STALE_HASH`), non-destructive archiving into `~/.koskill/archive/`, and pre-resolution snapshot backups in `~/.koskill/backups/`.
 
 ---
 
@@ -152,7 +157,10 @@ The hybrid search layer provides embedded vector and lexical search capabilities
 
 The React client adopts the GitHub Primer design system:
 
-- **Dashboard Shell (`App.tsx`)**: Header status indicator (`● Connected to 127.0.0.1:3900`), manual refresh action, light/dark theme toggle, and UnderlineNav tabs (Skills, Workflows, MCP Servers, Conflicts, Settings).
+- **Dashboard Shell (`App.tsx`, `AppHeader.tsx`)**: Header status indicator (`● Connected to 127.0.0.1:3900`), manual refresh action, light/dark theme toggle, and UnderlineNav tabs (Skills, Workflows, MCP Servers, Conflicts with dynamic danger counter badge, Settings).
+- **Conflict Queue (`ConflictList.tsx`)**: Displays pending conflicts with severity badges (`ERROR` red, `WARNING` amber), semantic match percentages, involved participating items, and "Review & Resolve" actions.
+- **Conflict Resolution Modal (`ConflictModal.tsx`)**: Side-by-side review modal featuring unified diffs, similarity percentage indicators, and one-click `PICK` (keep preferred), `ALIAS` (rename), and `MERGE` (combine definitions) resolution triggers.
+- **Diff Viewer (`DiffViewer.tsx`)**: Component rendering line-by-line additions, deletions, and percentage similarity pills.
 - **Discovery Table (`DiscoveryTable.tsx`)**: Instant client-side filtering across skill and workflow names, commands, ecosystems, and paths, with badge indicators and multi-select centralization toolbars.
 - **Skill Detail View (`SkillDetailView.tsx`)**: Dedicated inspection view featuring `← Back to Discovery` breadcrumb navigation, two-column responsive layout, and metadata summary card with bold frontmatter formatting.
 - **Workflow Detail View (`WorkflowDetailView.tsx`)**: Dedicated inspection view featuring invocation syntax display, argument hints, tool permission badges, Centralize/Revert action triggers, and raw prompt instruction panel.

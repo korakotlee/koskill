@@ -8,6 +8,8 @@ import {
   generateAgentsMcpSubset,
   loadMcpRegistry,
   discoverServerTools,
+  loadServerInstructions,
+  updateServerDiscoveryMetadata,
 } from '../../../src/core/storage/mcp-store.js';
 import { McpServerManifest } from '../../../src/core/types.js';
 
@@ -126,4 +128,68 @@ describe('MCP Central Store & Registry', () => {
     expect(tools[0].name).toBe('fetch_data');
     expect(tools[0].description).toBe('Fetches data from remote API');
   });
+
+  it('loads server instructions from filesystem fallback directory', async () => {
+    const mockMcpParentDir = path.join(tempDir, 'mcp');
+    const mockGithubDir = path.join(mockMcpParentDir, 'github');
+    await fs.mkdir(mockGithubDir, { recursive: true });
+    await fs.writeFile(
+      path.join(mockGithubDir, 'instructions.md'),
+      '# GitHub MCP Server Instructions\nUse this tool for issues and PRs.'
+    );
+
+    const instructions = await loadServerInstructions('github', [mockMcpParentDir]);
+    expect(instructions).toBe('# GitHub MCP Server Instructions\nUse this tool for issues and PRs.');
+
+    const missing = await loadServerInstructions('unknown', [mockMcpParentDir]);
+    expect(missing).toBeUndefined();
+  });
+
+  it('updates server discovery metadata in registry preserving user overrides', async () => {
+    const server: McpServerManifest = {
+      id: 'gemini:postgres',
+      name: 'postgres',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', 'mcp-server-postgres'],
+      declaredToolsCount: 1,
+      enabled: false,
+      status: 'centralized',
+      env: { PGUSER: 'admin' },
+    };
+
+    await centralizeMcpServer(server, customHome);
+    // ensure disabled is saved
+    await toggleMcpServer('postgres', false, customHome);
+
+    const updated = await updateServerDiscoveryMetadata(
+      'postgres',
+      {
+        title: 'PostgreSQL Server',
+        version: '1.4.2',
+        description: 'Direct SQL execution for PostgreSQL databases',
+        instructions: 'Run read-only queries with caution.',
+        tools: [
+          { name: 'query', description: 'Run SQL query' },
+          { name: 'tables', description: 'List database tables' },
+        ],
+      },
+      customHome
+    );
+
+    expect(updated.title).toBe('PostgreSQL Server');
+    expect(updated.version).toBe('1.4.2');
+    expect(updated.description).toBe('Direct SQL execution for PostgreSQL databases');
+    expect(updated.instructions).toBe('Run read-only queries with caution.');
+    expect(updated.declaredToolsCount).toBe(2);
+    expect(updated.enabled).toBe(false); // Preserved user override
+    expect(updated.env?.PGUSER).toBe('admin'); // Preserved user env
+    expect(updated.lastDiscoveredAt).toBeDefined();
+
+    const registry = await loadMcpRegistry(customHome);
+    expect(registry['postgres'].title).toBe('PostgreSQL Server');
+    expect(registry['postgres'].version).toBe('1.4.2');
+    expect(registry['postgres'].enabled).toBe(false);
+  });
 });
+

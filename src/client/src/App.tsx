@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './index.css';
 import { SkillManifest, McpServerManifest, WorkflowManifest } from '../../core/types.js';
+import { ConflictReport, ResolutionPayload } from '../../core/conflict/types.js';
 import { DiscoveryTable } from './components/DiscoveryTable.js';
 import { SkillDetailView } from './components/SkillDetailView.js';
 import { WorkflowDetailView } from './components/WorkflowDetailView.js';
 import { McpDetailView } from './components/McpDetailView.js';
 import { FlashNotification } from './components/FlashNotification.js';
 import { McpServerList } from './components/McpServerList.js';
+import { AppHeader } from './components/AppHeader.js';
+import { ConflictList } from './components/ConflictList.js';
+import { ConflictModal } from './components/ConflictModal.js';
 import { initialSkills, initialMcp, initialWorkflows } from './mockData.js';
 import { useInventoryActions } from './hooks/useInventoryActions.js';
 
@@ -18,6 +22,8 @@ export default function App(): React.ReactElement {
   const [skills, setSkills] = useState<SkillManifest[]>(initialSkills);
   const [mcpServers, setMcpServers] = useState<McpServerManifest[]>(initialMcp);
   const [workflows, setWorkflows] = useState<WorkflowManifest[]>(initialWorkflows);
+  const [conflicts, setConflicts] = useState<ConflictReport[]>([]);
+  const [selectedConflict, setSelectedConflict] = useState<ConflictReport | null>(null);
   const [selectedSkill, setSelectedSkill] = useState<SkillManifest | null>(null);
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowManifest | null>(null);
   const [selectedMcp, setSelectedMcp] = useState<McpServerManifest | null>(null);
@@ -35,10 +41,11 @@ export default function App(): React.ReactElement {
   const fetchInventory = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [skillsRes, mcpRes, workflowsRes] = await Promise.all([
+      const [skillsRes, mcpRes, workflowsRes, conflictsRes] = await Promise.all([
         fetch('/api/skills'),
         fetch('/api/mcp'),
         fetch('/api/workflows'),
+        fetch('/api/conflicts'),
       ]);
 
       if (skillsRes.ok) {
@@ -60,6 +67,13 @@ export default function App(): React.ReactElement {
         if (Array.isArray(workflowsData.workflows)) {
           setWorkflows(workflowsData.workflows);
           setSelectedWorkflow((prev) => (prev ? workflowsData.workflows.find((w: WorkflowManifest) => w.id === prev.id) || prev : null));
+        }
+      }
+      if (conflictsRes.ok) {
+        const confData = await conflictsRes.json();
+        if (Array.isArray(confData.conflicts)) {
+          setConflicts(confData.conflicts);
+          setSelectedConflict((prev) => (prev ? confData.conflicts.find((c: ConflictReport) => c.id === prev.id) || null : null));
         }
       }
       setIsConnected(true);
@@ -94,49 +108,35 @@ export default function App(): React.ReactElement {
     setSelectedMcp,
   });
 
+  const handleResolveConflict = async (payload: ResolutionPayload) => {
+    try {
+      const res = await fetch('/api/conflicts/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFlash({ type: 'success', message: data.message || 'Conflict resolved successfully' });
+        setSelectedConflict(null);
+        await fetchInventory();
+      } else {
+        setFlash({ type: 'danger', message: data.error || 'Failed to resolve conflict' });
+      }
+    } catch (err: any) {
+      setFlash({ type: 'danger', message: err.message || 'Failed to resolve conflict' });
+    }
+  };
+
   return (
     <div className="App">
-      <header className="App-header">
-        <div className="App-header-brand">
-          <a href="/" className="App-header-brand-link">
-            <img src="/logo.png" alt="KoSkill Logo" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
-            <span className="App-header-title">KoSkill</span>
-          </a>
-          <span className="App-header-tag">v0.1.0</span>
-          <span
-            style={{
-              fontSize: '12px',
-              color: isConnected ? 'var(--color-success-fg)' : 'var(--color-danger-fg)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              marginLeft: '8px',
-            }}
-          >
-            ● {isConnected ? 'Connected to 127.0.0.1:3900' : 'Offline'}
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <button
-            type="button"
-            className="Btn"
-            onClick={fetchInventory}
-            disabled={isRefreshing}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-          >
-            {isRefreshing ? 'Scanning...' : 'Refresh Discovery'}
-          </button>
-          <button
-            type="button"
-            className="Theme-toggle"
-            onClick={toggleTheme}
-            aria-label="Toggle Theme"
-          >
-            Theme: {colorMode === 'light' ? 'Light' : 'Dark'}
-          </button>
-        </div>
-      </header>
+      <AppHeader
+        isConnected={isConnected}
+        isRefreshing={isRefreshing}
+        colorMode={colorMode}
+        onRefresh={fetchInventory}
+        onToggleTheme={toggleTheme}
+      />
 
       <main className="App-main" style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 16px' }}>
         {flash && (
@@ -200,7 +200,17 @@ export default function App(): React.ReactElement {
                 className={`UnderlineNav-item ${activeTab === 'conflicts' ? 'selected' : ''}`}
                 onClick={() => setActiveTab('conflicts')}
               >
-                Conflicts <span className="Counter">0</span>
+                Conflicts{' '}
+                <span
+                  className="Counter"
+                  style={
+                    conflicts.length > 0
+                      ? { backgroundColor: 'var(--color-danger-fg)', color: '#fff' }
+                      : undefined
+                  }
+                >
+                  {conflicts.length}
+                </span>
               </button>
               <button
                 type="button"
@@ -240,14 +250,10 @@ export default function App(): React.ReactElement {
               />
             )}
             {activeTab === 'conflicts' && (
-              <div className="Box">
-                <div className="Box-header">
-                  <span className="Box-title">Conflict Resolution Queue</span>
-                </div>
-                <div className="Box-row" style={{ color: 'var(--color-success-fg)' }}>
-                  No synchronization conflicts detected across registered agents.
-                </div>
-              </div>
+              <ConflictList
+                conflicts={conflicts}
+                onSelectConflict={(conflict) => setSelectedConflict(conflict)}
+              />
             )}
             {activeTab === 'settings' && (
               <div className="Box">
@@ -263,6 +269,14 @@ export default function App(): React.ReactElement {
               </div>
             )}
           </>
+        )}
+
+        {selectedConflict && (
+          <ConflictModal
+            conflict={selectedConflict}
+            onClose={() => setSelectedConflict(null)}
+            onResolve={handleResolveConflict}
+          />
         )}
       </main>
     </div>

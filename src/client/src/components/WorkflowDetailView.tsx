@@ -1,13 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { WorkflowManifest } from '../../../core/types.js';
 import { MarkdownViewer } from './MarkdownViewer.js';
+import { StorageStatusBadge } from './StorageStatusBadge.js';
+import { SymlinkActions } from './SymlinkActions.js';
+import { CentralizeConfirmModal } from './CentralizeConfirmModal.js';
 
 export interface WorkflowDetailViewProps {
   workflow: WorkflowManifest;
   onBack: () => void;
+  onCentralizeWorkflow?: (workflow: WorkflowManifest) => Promise<void> | void;
+  onRevertWorkflow?: (workflow: WorkflowManifest) => Promise<void> | void;
 }
 
-export const WorkflowDetailView: React.FC<WorkflowDetailViewProps> = ({ workflow, onBack }) => {
+export const WorkflowDetailView: React.FC<WorkflowDetailViewProps> = ({
+  workflow,
+  onBack,
+  onCentralizeWorkflow,
+  onRevertWorkflow,
+}) => {
+  const [modalAction, setModalAction] = useState<'centralize' | 'revert' | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const lineCount = workflow.rawContent ? workflow.rawContent.split('\n').length : 0;
   const isGemini = workflow.targetEcosystem === 'gemini';
   const badgeClass = isGemini ? 'Label Label--accent' : 'Label Label--done';
@@ -15,6 +28,21 @@ export const WorkflowDetailView: React.FC<WorkflowDetailViewProps> = ({ workflow
   const invocationSyntax = workflow.metadata?.argumentHint
     ? `${workflow.command} ${workflow.metadata.argumentHint}`
     : workflow.command;
+
+  const handleConfirmAction = async () => {
+    if (!modalAction) return;
+    setIsSubmitting(true);
+    try {
+      if (modalAction === 'centralize') {
+        await onCentralizeWorkflow?.(workflow);
+      } else if (modalAction === 'revert') {
+        await onRevertWorkflow?.(workflow);
+      }
+      setModalAction(null);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div>
@@ -24,7 +52,7 @@ export const WorkflowDetailView: React.FC<WorkflowDetailViewProps> = ({ workflow
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '20px'
+          marginBottom: '20px',
         }}
       >
         <button
@@ -36,11 +64,20 @@ export const WorkflowDetailView: React.FC<WorkflowDetailViewProps> = ({ workflow
             alignItems: 'center',
             gap: '6px',
             color: 'var(--color-accent-fg)',
-            fontWeight: 500
+            fontWeight: 500,
           }}
         >
           &larr; Back to Discovery
         </button>
+
+        {(onCentralizeWorkflow || onRevertWorkflow) && (
+          <SymlinkActions
+            skill={workflow as any}
+            onCentralize={() => setModalAction('centralize')}
+            onRevert={() => setModalAction('revert')}
+            variant="detail"
+          />
+        )}
       </div>
 
       {/* Detail Header */}
@@ -50,13 +87,14 @@ export const WorkflowDetailView: React.FC<WorkflowDetailViewProps> = ({ workflow
           alignItems: 'baseline',
           gap: '12px',
           marginBottom: '16px',
-          flexWrap: 'wrap'
+          flexWrap: 'wrap',
         }}
       >
         <h2 style={{ fontSize: '24px', fontWeight: 600, margin: 0 }}>
           <code style={{ fontSize: '24px', fontWeight: 600 }}>{workflow.command}</code>
         </h2>
         <span className={badgeClass}>{workflow.targetEcosystem}</span>
+        <StorageStatusBadge status={workflow.status || 'original'} />
         <span className="Label Label--secondary">{workflow.scope}</span>
       </div>
 
@@ -183,6 +221,24 @@ export const WorkflowDetailView: React.FC<WorkflowDetailViewProps> = ({ workflow
           </div>
         </div>
       </div>
+
+      {modalAction && (
+        <CentralizeConfirmModal
+          isOpen={true}
+          action={modalAction}
+          items={[
+            {
+              skillId: workflow.id,
+              skillName: workflow.name,
+              sourcePath: workflow.sourcePath,
+              targetCentralPath: workflow.targetPath,
+            },
+          ]}
+          onConfirm={handleConfirmAction}
+          onCancel={() => setModalAction(null)}
+          isSubmitting={isSubmitting}
+        />
+      )}
     </div>
   );
 };

@@ -1,55 +1,5 @@
 @import './styles/primer.css';
 
-/* GitHub Primer Design System Variables */
-:root, [data-color-mode="light"] {
-  --color-canvas-default: #ffffff;
-  --color-canvas-subtle: #f6f8fa;
-  --color-canvas-inset: #eff2f5;
-  --color-border-default: #d0d7de;
-  --color-border-muted: #d8dee4;
-  --color-fg-default: #1f2328;
-  --color-fg-muted: #656d76;
-  --color-accent-fg: #0969da;
-  --color-accent-subtle: #ddf4ff;
-  --color-success-fg: #1a7f37;
-  --color-success-subtle: #dafbe1;
-  --color-success-emphasis: #1f883d;
-  --color-attention-fg: #9a6700;
-  --color-attention-subtle: #fff8c5;
-  --color-danger-fg: #cf222e;
-  --color-danger-subtle: #ffebe9;
-  --color-done-fg: #8250df;
-  --color-done-subtle: #fbefff;
-  --color-counter-bg: rgba(175, 184, 193, 0.2);
-  --border-radius-small: 6px;
-  --border-radius-medium: 8px;
-  --border-radius-full: 9999px;
-  --box-shadow-card: 0 1px 0 rgba(31, 35, 40, 0.04);
-}
-
-[data-color-mode="dark"], body.dark {
-  --color-canvas-default: #0d1117;
-  --color-canvas-subtle: #161b22;
-  --color-canvas-inset: #010409;
-  --color-border-default: #30363d;
-  --color-border-muted: #21262d;
-  --color-fg-default: #e6edf3;
-  --color-fg-muted: #848d97;
-  --color-accent-fg: #2f81f7;
-  --color-accent-subtle: rgba(56, 139, 253, 0.15);
-  --color-success-fg: #3fb950;
-  --color-success-subtle: rgba(46, 160, 67, 0.15);
-  --color-success-emphasis: #238636;
-  --color-attention-fg: #d29922;
-  --color-attention-subtle: rgba(187, 128, 9, 0.15);
-  --color-danger-fg: #f85149;
-  --color-danger-subtle: rgba(248, 81, 73, 0.15);
-  --color-done-fg: #a371f7;
-  --color-done-subtle: rgba(163, 113, 247, 0.15);
-  --color-counter-bg: rgba(110, 118, 129, 0.4);
-  --box-shadow-card: 0 1px 0 rgba(1, 4, 9, 0.4);
-}
-
 * {
   box-sizing: border-box;
   margin: 0;
@@ -197,7 +147,8 @@ body {
 }
 
 /* Buttons */
-.Btn {
+.Btn,
+.btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -210,20 +161,60 @@ body {
   background-color: var(--color-canvas-subtle);
   color: var(--color-fg-default);
   transition: all 0.15s ease;
+  user-select: none;
+  text-decoration: none;
 }
 
-.Btn:hover {
+.Btn:hover, .btn:hover {
   background-color: var(--color-canvas-inset);
 }
 
-.Btn-primary {
+.Btn:disabled, .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.Btn-primary, .btn-primary {
   background-color: var(--color-success-emphasis);
   color: #ffffff;
   border-color: rgba(31, 35, 40, 0.15);
 }
 
-.Btn-primary:hover {
+.Btn-primary:hover, .btn-primary:hover {
   background-color: #1a7f37;
+}
+
+.Btn-outline, .btn-outline {
+  background-color: transparent;
+  color: var(--color-accent-fg);
+  border-color: var(--color-border-default);
+}
+
+.Btn-outline:hover, .btn-outline:hover {
+  background-color: var(--color-canvas-subtle);
+  border-color: var(--color-accent-fg);
+}
+
+.Btn-sm, .btn-sm {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.btn-octicon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-fg-muted);
+  padding: 4px;
+  border-radius: var(--border-radius-small);
+}
+
+.btn-octicon:hover {
+  color: var(--color-fg-default);
+  background-color: var(--color-canvas-subtle);
 }
 
 /* Badges / Labels */
@@ -258,4 +249,3 @@ body {
   color: var(--color-fg-muted);
   border: 1px solid var(--color-border-default);
 }
-

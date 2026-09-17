@@ -5,15 +5,17 @@ This document provides a comprehensive technical reference for engineers, DevOps
 ---
 
 ## Table of Contents
-
-1. [Running & Execution Instructions](#1-running--execution-instructions)
-2. [High-Level Architecture & Modular Target Graph](#2-high-level-architecture--modular-target-graph)
-3. [Core Discovery Scanner Service](#3-core-discovery-scanner-service)
-4. [HTTP Daemon REST Endpoints](#4-http-daemon-rest-endpoints)
-5. [Frontend Presentation & Views](#5-frontend-presentation--views)
-6. [Security, Cryptography & Privacy](#6-security-cryptography--privacy)
-7. [Observability & Structured Logging](#7-observability--structured-logging)
-8. [Linting, Testing & Verification Standards](#8-linting-testing--verification-standards)
+ 
+ 1. [Running & Execution Instructions](#1-running--execution-instructions)
+ 2. [High-Level Architecture & Modular Target Graph](#2-high-level-architecture--modular-target-graph)
+ 3. [Core Discovery Scanner Service](#3-core-discovery-scanner-service)
+ 4. [HTTP Daemon REST Endpoints](#4-http-daemon-rest-endpoints)
+ 5. [Central Storage, Symlink Managers & MCP Client](#5-central-storage-symlink-managers--mcp-client)
+ 6. [Hybrid Search Engine & Semantic Conflict Detection](#6-hybrid-search-engine--semantic-conflict-detection)
+ 7. [Frontend Presentation & Views](#7-frontend-presentation--views)
+ 8. [Security, Cryptography & Privacy](#8-security-cryptography--privacy)
+ 9. [Observability & Structured Logging](#9-observability--structured-logging)
+ 10. [Linting, Testing & Verification Standards](#10-linting-testing--verification-standards)
 
 ---
 
@@ -111,6 +113,8 @@ The Node.js HTTP server binds strictly to `127.0.0.1:3900`:
 - `POST /api/mcp/:name/toggle`: Toggles the enabled state of an MCP server (`{ enabled: boolean }`).
 - `POST /api/mcp/:name/query-tools`: Connects to an MCP server process over stdio via JSON-RPC 2.0 (`initialize` + `tools/list`), discovers available tools, updates `declaredToolsCount`, and caches them in `~/.koskill/mcp/servers.json`.
 - `POST /api/mcp/generate-subset`: Generates `agents_mcp/servers.json` containing only enabled MCP servers.
+- `GET /api/search/query`: Executes hybrid vector + lexical search queries (`?q=<query>&limit=<n>&itemType=<type>&ecosystem=<eco>`) returning RRF-ranked results.
+- `POST /api/search/reindex`: Triggers incremental re-indexing of all discovered skills and workflows into `~/.koskill/cache/index.db`.
 
 ---
 
@@ -127,7 +131,21 @@ The core system manages the `~/.koskill/` hierarchy and active runtime communica
 
 ---
 
-## 6. Frontend Presentation & Views
+## 6. Hybrid Search Engine & Semantic Conflict Detection
+
+The hybrid search layer provides embedded vector and lexical search capabilities at `~/.koskill/cache/index.db`:
+
+- **Database Manager (`db.ts`)**: Initializes SQLite in WAL mode with `better-sqlite3`, dynamically loading the `sqlite-vec` extension and provisioning `items_meta`, `items_vec` (384-dimensional cosine distance), and `items_fts` (FTS5 BM25). Gracefully degrades to pure FTS5 if vector extensions are unavailable.
+- **Local Embedder (`embedder.ts`)**: Generates normalized 384-dimensional dense vectors using `@xenova/transformers` with ONNX models (`all-MiniLM-L6-v2`). Lazily loads weights on demand to maintain sub-200ms daemon cold-start performance.
+- **Incremental Indexer (`indexer.ts`)**: Synchronizes scanned skills and workflows into SQLite. Computes deterministic SHA-256 CAS content hashes to skip unmodified records, cutting re-index times to milliseconds.
+- **Hybrid Search & RRF Scorer (`hybrid.ts`)**: Combines vector KNN distance and lexical BM25 rank using scale-invariant Reciprocal Rank Fusion:
+  $$RRF(d) = \sum_{m \in \{vec, fts\}} \frac{1}{k + rank_m(d)} \quad (k=60)$$
+- **Semantic Conflict Detector (`semantic.ts`)**: Evaluates vector similarity across skills to detect functional duplicates with differing titles (cosine similarity >= 0.85) and flags prompt instruction collisions for shared command triggers.
+- **Capability Router (`routeCapabilities`)**: Discovers and ranks top-K relevant skills and workflows matching user queries in under 30ms.
+
+---
+
+## 7. Frontend Presentation & Views
 
 The React client adopts the GitHub Primer design system:
 
@@ -142,7 +160,7 @@ The React client adopts the GitHub Primer design system:
 
 ---
 
-## 6. Security, Cryptography & Privacy
+## 8. Security, Cryptography & Privacy
 
 - **Localhost Binding**: All HTTP services bind strictly to `127.0.0.1` to prevent LAN exposure.
 - **Read-Only Inspection**: Discovery scanning performs strictly read-only filesystem reads.
@@ -150,7 +168,7 @@ The React client adopts the GitHub Primer design system:
 
 ---
 
-## 7. Observability & Structured Logging
+## 9. Observability & Structured Logging
 
 Centralized structured logger outputs timestamped JSON messages to `log/agent.log`:
 - Scanned counts and warnings for corrupted configuration files.
@@ -158,7 +176,7 @@ Centralized structured logger outputs timestamped JSON messages to `log/agent.lo
 
 ---
 
-## 8. Linting, Testing & Verification Standards
+## 10. Linting, Testing & Verification Standards
 
 All code is strictly typed and verified through Vitest:
 - `npm run lint`: TypeScript strict type check (`tsc --noEmit`).

@@ -8,6 +8,7 @@ export interface McpServerListProps {
   onGenerateSubset?: () => Promise<void> | void;
   onToggleEnabled?: (server: McpServerManifest, enabled: boolean) => Promise<void> | void;
   onCentralizeServer?: (server: McpServerManifest) => Promise<void> | void;
+  onDiscoverServer?: (server: McpServerManifest) => Promise<void> | void;
 }
 
 /**
@@ -19,8 +20,20 @@ export const McpServerList: React.FC<McpServerListProps> = ({
   onGenerateSubset,
   onToggleEnabled,
   onCentralizeServer,
+  onDiscoverServer,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [discoveringMap, setDiscoveringMap] = useState<Record<string, boolean>>({});
+
+  const handleDiscover = async (server: McpServerManifest) => {
+    if (!onDiscoverServer) return;
+    setDiscoveringMap((prev) => ({ ...prev, [server.name]: true }));
+    try {
+      await onDiscoverServer(server);
+    } finally {
+      setDiscoveringMap((prev) => ({ ...prev, [server.name]: false }));
+    }
+  };
 
   const handleGenerate = async () => {
     if (!onGenerateSubset) return;
@@ -89,7 +102,7 @@ export const McpServerList: React.FC<McpServerListProps> = ({
               }}
             >
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={() => onSelectServer?.(mcp)}
@@ -104,8 +117,21 @@ export const McpServerList: React.FC<McpServerListProps> = ({
                       textAlign: 'left',
                     }}
                   >
-                    {mcp.name}
+                    {mcp.title || mcp.name}
                   </button>
+                  {mcp.title && mcp.title !== mcp.name && (
+                    <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
+                      ({mcp.name})
+                    </span>
+                  )}
+                  {mcp.version && (
+                    <span
+                      className="Label Label--secondary"
+                      style={{ fontSize: '11px' }}
+                    >
+                      v{mcp.version}
+                    </span>
+                  )}
                   <StorageStatusBadge status={mcp.status || 'original'} />
                   <span
                     className="Label"
@@ -118,6 +144,18 @@ export const McpServerList: React.FC<McpServerListProps> = ({
                     {isEnabled ? 'Enabled' : 'Disabled'}
                   </span>
                 </div>
+                {mcp.description && (
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: 'var(--color-fg-muted)',
+                      marginBottom: '4px',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {mcp.description}
+                  </div>
+                )}
                 <div style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
                   Transport: {mcp.transport} | Command: <code>{mcp.command}</code>
                 </div>
@@ -125,6 +163,18 @@ export const McpServerList: React.FC<McpServerListProps> = ({
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span className="Label Label--accent">{mcp.declaredToolsCount} tools</span>
+
+                {onDiscoverServer && mcp.command && (
+                  <button
+                    type="button"
+                    className="Btn"
+                    style={{ fontSize: '12px', padding: '3px 8px' }}
+                    onClick={() => handleDiscover(mcp)}
+                    disabled={Boolean(discoveringMap[mcp.name])}
+                  >
+                    {discoveringMap[mcp.name] ? 'Discovering...' : 'Discover'}
+                  </button>
+                )}
 
                 {onToggleEnabled && (
                   <button

@@ -13,9 +13,11 @@ This document provides a comprehensive technical reference for engineers, DevOps
  5. [Central Storage, Symlink Managers & MCP Client](#5-central-storage-symlink-managers--mcp-client)
  6. [Hybrid Search Engine & Semantic Conflict Detection](#6-hybrid-search-engine--semantic-conflict-detection)
  7. [Frontend Presentation & Views](#7-frontend-presentation--views)
- 8. [Security, Cryptography & Privacy](#8-security-cryptography--privacy)
- 9. [Observability & Structured Logging](#9-observability--structured-logging)
- 10. [Linting, Testing & Verification Standards](#10-linting-testing--verification-standards)
+ 8. [Activation Toggles, Backup Packaging & Credential Vault](#8-activation-toggles-backup-packaging--credential-vault)
+ 9. [Auto-Router & Meta-MCP Server Architecture](#9-auto-router--meta-mcp-server-architecture)
+ 10. [Security, Cryptography & Privacy](#10-security-cryptography--privacy)
+ 11. [Observability & Structured Logging](#11-observability--structured-logging)
+ 12. [Linting, Testing & Verification Standards](#12-linting-testing--verification-standards)
 
 ---
 
@@ -110,6 +112,7 @@ The Node.js HTTP server binds strictly to `127.0.0.1:3900`:
 - `POST /api/workflows/:id/revert`: Reverts a centralized workflow symlink back to a standalone local markdown file.
 - `POST /api/workflows/batch/centralize`: Accepts `{ workflowIds: string[] }` and centralizes multiple workflows sequentially.
 - `POST /api/mcp/:name/centralize`: Registers an MCP server into `~/.koskill/mcp/servers.json`.
+- `POST /api/mcp/:name/revert`: Reverts a centralized MCP server by removing it from `~/.koskill/mcp/servers.json`, returning its status back to `original`.
 - `POST /api/mcp/:name/toggle`: Toggles the enabled state of an MCP server (`{ enabled: boolean }`).
 - `POST /api/mcp/:name/query-tools`: Connects to an MCP server process over stdio via JSON-RPC 2.0 (`initialize` + `tools/list`), discovers available tools, updates `declaredToolsCount`, and caches them in `~/.koskill/mcp/servers.json`.
 - `POST /api/mcp/:name/discover`: Proactively probes an MCP server over stdio using `server/discover` (with fallback to `initialize` and local `instructions.md`), extracting title, version, description, instructions, and tools.
@@ -119,6 +122,10 @@ The Node.js HTTP server binds strictly to `127.0.0.1:3900`:
 - `POST /api/search/reindex`: Triggers incremental re-indexing of all discovered skills and workflows into `~/.koskill/cache/index.db`.
 - `GET /api/conflicts`: Executes tiered conflict detection (exact name/hash, semantic duplicate, command divergence, MCP tools) and returns structured conflict reports.
 - `POST /api/conflicts/resolve`: Executes atomic conflict resolution (`PICK`, `ALIAS`, `MERGE`) with optimistic CAS hash checks and pre-resolution archiving.
+- `GET /api/router/logs`: Queries transaction log ring buffer (`~/.koskill/cache/router_tx.log`) with pagination (`?limit=50&offset=0`).
+- `GET /api/router/status`: Returns Auto-Router activation state, active child processes, tool counts, and cumulative metrics (total transactions, token savings, average latency).
+- `POST /api/router/toggle`: Reversibly enables or disables Auto-Router prompt injection and symlink state (`{ enabled: boolean, dryRun?: boolean }`).
+- `GET /api/router/stream`: Real-time Server-Sent Events (SSE) telemetry stream pushing live transaction events to the UI dashboard.
 
 ---
 
@@ -131,7 +138,7 @@ The core system manages the `~/.koskill/` hierarchy and active runtime communica
 - **Store Coordinator (`store.ts`)**: Idempotently initializes `~/.koskill/skills/`, `~/.koskill/workflows/`, and `~/.koskill/mcp/` directories with safe permissions.
 - **Skill Symlink Manager (`symlink-manager.ts`)**: Executes two-phase copy, backup, atomic symlink generation, and reversible rollback routines for directory-based skill migrations.
 - **Workflow Symlink Manager (`workflow-symlink-manager.ts`)**: Executes atomic migration and symlinking for standalone workflow `.md` files.
-- **MCP Registry Store (`mcp-store.ts`)**: Maintains canonical server declarations in `~/.koskill/mcp/servers.json`, supports server activation toggling, metadata updates (`updateServerDiscoveryMetadata`), tool schema caching, local `instructions.md` loading, and exports subsets into `agents_mcp/servers.json`.
+- **MCP Registry Store (`mcp-store.ts`)**: Maintains canonical server declarations in `~/.koskill/mcp/servers.json`, supports individual server centralize and revert operations (`centralizeMcpServer`, `revertMcpServer`), server activation toggling, metadata updates (`updateServerDiscoveryMetadata`), tool schema caching, local `instructions.md` loading, and exports subsets into `agents_mcp/servers.json`.
 - **Transaction Journal (`journal.ts`)**: Appends atomic transaction records to `~/.koskill/journal.json` with status tracking (`COMPLETED`, `FAILED`, `ROLLED_BACK`).
 
 ---
@@ -142,11 +149,12 @@ The hybrid search layer provides embedded vector and lexical search capabilities
 
 - **Database Manager (`db.ts`)**: Initializes SQLite in WAL mode with `better-sqlite3`, dynamically loading the `sqlite-vec` extension and provisioning `items_meta`, `items_vec` (384-dimensional cosine distance), and `items_fts` (FTS5 BM25). Gracefully degrades to pure FTS5 if vector extensions are unavailable.
 - **Local Embedder (`embedder.ts`)**: Generates normalized 384-dimensional dense vectors using `@xenova/transformers` with ONNX models (`all-MiniLM-L6-v2`). Lazily loads weights on demand to maintain sub-200ms daemon cold-start performance.
-- **Incremental Indexer (`indexer.ts`)**: Synchronizes scanned skills and workflows into SQLite. Computes deterministic SHA-256 CAS content hashes to skip unmodified records, cutting re-index times to milliseconds.
+- **Incremental Indexer (`indexer.ts`)**: Synchronizes scanned skills, workflows, and individual MCP tools into SQLite. Computes deterministic SHA-256 CAS content hashes to skip unmodified records, cutting re-index times to milliseconds.
+- **Index Synchronization Service (`sync.ts`)**: Orchestrates unified batch synchronization across scanned inventories and central registries (`servers.json`), populating vector embeddings and lexical tables for all capabilities.
 - **Hybrid Search & RRF Scorer (`hybrid.ts`)**: Combines vector KNN distance and lexical BM25 rank using scale-invariant Reciprocal Rank Fusion:
   $$RRF(d) = \sum_{m \in \{vec, fts\}} \frac{1}{k + rank_m(d)} \quad (k=60)$$
 - **Semantic Conflict Detector (`semantic.ts`)**: Evaluates vector similarity across skills to detect functional duplicates with differing titles (cosine similarity >= 0.85) and flags prompt instruction collisions for shared command triggers.
-- **Capability Router (`routeCapabilities`)**: Discovers and ranks top-K relevant skills and workflows matching user queries in under 30ms.
+- **Capability Router (`routeCapabilities`)**: Discovers and ranks top-K relevant skills, workflows, and downstream MCP tools matching user queries in under 30ms.
 - **Tiered Conflict Engine (`detector.ts`, `semantic.ts`)**: Executes Tier 1 exact name and content hash checks, Tier 2 semantic duplicate checks, Tier 3 command instruction divergence checks, and MCP tool collisions across all servers.
 - **Unified Diff Generator (`diff.ts`)**: Line-based LCS diff algorithm computing line additions, deletions, context blocks, and unified diff output.
 - **Atomic Conflict Resolver (`resolver.ts`)**: Implements safe `PICK`, `ALIAS`, and `MERGE` actions with optimistic CAS hash validation (`E_STALE_HASH`), non-destructive archiving into `~/.koskill/archive/`, and pre-resolution snapshot backups in `~/.koskill/backups/`.
@@ -164,8 +172,8 @@ The React client adopts the GitHub Primer design system:
 - **Discovery Table (`DiscoveryTable.tsx`)**: Instant client-side filtering across skill and workflow names, commands, ecosystems, and paths, with badge indicators and multi-select centralization toolbars.
 - **Skill Detail View (`SkillDetailView.tsx`)**: Dedicated inspection view featuring `← Back to Discovery` breadcrumb navigation, two-column responsive layout, and metadata summary card with bold frontmatter formatting.
 - **Workflow Detail View (`WorkflowDetailView.tsx`)**: Dedicated inspection view featuring invocation syntax display, argument hints, tool permission badges, Centralize/Revert action triggers, and raw prompt instruction panel.
-- **MCP Server List (`McpServerList.tsx`)**: Inventory of configured MCP servers with titles, version badges, description snippets, quick "Discover" actions with spinner states, activation toggle buttons, and an action bar to generate `agents_mcp/servers.json`.
-- **MCP Detail View (`McpDetailView.tsx`)**: Dedicated inspection view featuring Server Overview card, Agent Instructions markdown viewer, tool capability tables (`McpToolsTable.tsx`), runtime command/args, transport type, and interactive "Discover Server" action.
+- **MCP Server List (`McpServerList.tsx`)**: Inventory of configured MCP servers with titles, version badges, description snippets, Centralize/Revert action triggers, quick "Discover" actions with spinner states, activation toggle buttons, and an action bar to generate `agents_mcp/servers.json`.
+- **MCP Detail View (`McpDetailView.tsx`)**: Dedicated inspection view featuring Server Overview card, Agent Instructions markdown viewer, tool capability tables (`McpToolsTable.tsx`), Centralize / Revert to Original action buttons, runtime command/args, transport type, and interactive "Discover Server" action.
 - **Backup & Restore Modal (`BackupModal.tsx`)**: Modal dialog for machine-to-machine `.tar.gz` export and import with tar-slip protection and collision alerts.
 - **Credential Vault Drawer (`VaultDrawer.tsx`)**: Slide-out drawer for secure local API key configuration with masked previews and password inputs.
 - **Entity Toggle Switch (`EntityToggleSwitch.tsx`)**: Reusable toggle button with optimistic status feedback across skills, workflows, and MCP servers.
@@ -191,7 +199,64 @@ The React client adopts the GitHub Primer design system:
 
 ---
 
-## 9. Security, Cryptography & Privacy
+## 9. Auto-Router & Meta-MCP Server Architecture
+
+The Auto-Router subsystem (`src/core/router/`) provides a lightweight Meta-MCP server layer over stdio that replaces dozens of registered agent tools with three dynamic meta-tools:
+
+```mermaid
+flowchart TD
+    Agent["AI Coding Agent<br/>(Gemini / Claude / AGY)"]
+    MetaServer["Meta-MCP Server (stdio)<br/>src/core/router/meta-mcp.ts"]
+    Proxy["Downstream Child Proxy<br/>src/core/router/mcp-proxy.ts"]
+    Logger["Transaction WAL Logger<br/>src/core/router/logger.ts"]
+    HybridDb["Search Engine (SQLite)<br/>~/.koskill/cache/index.db"]
+    Downstream["Downstream MCP Server<br/>(git, sqlite, devtools, etc.)"]
+
+    Agent -->|"stdio JSON-RPC 2.0"| MetaServer
+    MetaServer -->|"1. discover_capabilities"| HybridDb
+    MetaServer -->|"2. invoke_tool"| Proxy
+    MetaServer -->|"3. load_skill"| HybridDb
+    Proxy -->|"Lazy spawn & stdio"| Downstream
+    MetaServer -->|"Log transactions"| Logger
+    Logger -->|"WAL & Ring Buffer"| DiskLog["~/.koskill/cache/router_tx.log"]
+```
+
+### Core Subsystem Components
+
+- **Meta-MCP Server (`meta-mcp.ts`)**:
+  - Implements stdio JSON-RPC 2.0 server lifecycle (`initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`).
+  - Strict JSON-RPC 2.0 notification compliance: messages without an `id` or prefixed with `notifications/` are processed silently without emitting spurious error frames.
+  - Exposes only 3 meta-tools: `discover_capabilities`, `invoke_tool`, and `load_skill`.
+  - Injects category filtering and compact capability descriptors (< 150 tokens) to reduce context overhead by up to 87%.
+  - Handles `load_skill` requests with frontmatter stripping and companion asset indexing (`scripts/`, `references/`, `resources/`).
+- **Downstream MCP Proxy & Pool (`mcp-proxy.ts`, `pid-tracker.ts`)**:
+  - Lazily spawns downstream MCP server processes on demand via `child_process.spawn`.
+  - Restricts pool concurrency to a maximum of 5 simultaneous child processes.
+  - Automatically reclaims idle processes after 5 minutes of inactivity using an LRU eviction strategy.
+  - Enforces a strict 15-second per-call execution timeout via `AbortController`.
+  - Filters out non-JSON stdout debug lines to prevent JSON-RPC parser crashes.
+  - Tracks child process PIDs in `~/.koskill/cache/pids.json` and cleanly handles `SIGINT` / `SIGTERM` signals.
+- **Transaction Logger & Ring Buffer (`logger.ts`)**:
+  - Appends every routed transaction to an append-only WAL file at `~/.koskill/cache/router_tx.log`.
+  - Maintains an in-memory circular ring buffer truncated at the most recent 1,000 transactions.
+  - Computes dynamic token savings:
+    $$\text{Token Savings} = (\text{Registered Tools} \times 200) - (3 \times 200 + \text{Discovered Capabilities} \times 15)$$
+- **Reversible Router Toggle (`toggle-router.ts`)**:
+  - Automatically registers `"koskill-router"` into active agent configurations (`~/.gemini/antigravity-ide/mcp_config.json`, `~/.gemini/config/mcp_config.json`, `~/.claude/mcp.json`).
+  - Partitions MCP servers into two tiers:
+    - **Centralized MCP Servers** (managed by KoSkill in `~/.koskill/mcp/servers.json`): Moved downstream by marking them `disabled: true` and `_koskillDownstream: true`, delegating execution to the router proxy.
+    - **Normal MCP Servers** (unmanaged original servers): Left active and unmodified so they remain directly available in AGY-IDE and coding assistants.
+  - Safely injects and strips prompt guidance blocks (`<!-- KOSKILL_ROUTER_START -->`) into `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md`.
+  - Manages skill symlink `.disabled` renaming.
+  - Supports dry-run execution preview returning exact filesystem operations before committing changes.
+- **CLI Runner & Binary (`bin/koskill`, `src/cli/commands/router.ts`, `src/cli/index.ts`)**:
+  - `bin/koskill` provides a zero-config executable CLI wrapper with dynamic `tsx` ESM loader resolution and signal forwarding (`SIGINT`, `SIGTERM`).
+  - Running `npm link` exposes `koskill` on `$PATH` across agent environments.
+  - Command `koskill router run` directly launches the Meta-MCP server over stdio for agent integration.
+
+---
+
+## 10. Security, Cryptography & Privacy
 
 - **Localhost Binding**: All HTTP services bind strictly to `127.0.0.1` to prevent LAN exposure.
 - **Read-Only Inspection**: Discovery scanning performs strictly read-only filesystem reads.
@@ -200,15 +265,16 @@ The React client adopts the GitHub Primer design system:
 
 ---
 
-## 9. Observability & Structured Logging
+## 11. Observability & Structured Logging
 
 Centralized structured logger outputs timestamped JSON messages to `log/agent.log`:
 - Scanned counts and warnings for corrupted configuration files.
 - Unhandled routing errors and daemon lifecycle events.
+- Transaction events streamable in real-time via `GET /api/router/stream`.
 
 ---
 
-## 10. Linting, Testing & Verification Standards
+## 12. Linting, Testing & Verification Standards
 
 All code is strictly typed and verified through Vitest:
 - `npm run lint`: TypeScript strict type check (`tsc --noEmit`).

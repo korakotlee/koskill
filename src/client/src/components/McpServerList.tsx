@@ -9,6 +9,7 @@ export interface McpServerListProps {
   onGenerateSubset?: () => Promise<void> | void;
   onToggleEnabled?: (server: McpServerManifest, enabled: boolean) => Promise<void> | void;
   onCentralizeServer?: (server: McpServerManifest) => Promise<void> | void;
+  onRevertServer?: (server: McpServerManifest) => Promise<void> | void;
   onDiscoverServer?: (server: McpServerManifest) => Promise<void> | void;
 }
 
@@ -21,6 +22,7 @@ export const McpServerList: React.FC<McpServerListProps> = ({
   onGenerateSubset,
   onToggleEnabled,
   onCentralizeServer,
+  onRevertServer,
   onDiscoverServer,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -199,6 +201,21 @@ export const McpServerList: React.FC<McpServerListProps> = ({
                     onClick={() => onCentralizeServer(mcp)}
                   >
                     Centralize
+                  </button>
+                )}
+
+                {onRevertServer && mcp.status === 'centralized' && (
+                  <button
+                    type="button"
+                    className="Btn"
+                    style={{
+                      fontSize: '12px',
+                      padding: '3px 8px',
+                      color: 'var(--color-fg-muted)',
+                    }}
+                    onClick={() => onRevertServer(mcp)}
+                  >
+                    Revert
                   </button>
                 )}
 

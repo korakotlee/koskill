@@ -10,6 +10,7 @@ import {
   discoverServerTools,
   loadServerInstructions,
   updateServerDiscoveryMetadata,
+  revertMcpServer,
 } from '../../../src/core/storage/mcp-store.js';
 import { McpServerManifest } from '../../../src/core/types.js';
 
@@ -190,6 +191,39 @@ describe('MCP Central Store & Registry', () => {
     expect(registry['postgres'].title).toBe('PostgreSQL Server');
     expect(registry['postgres'].version).toBe('1.4.2');
     expect(registry['postgres'].enabled).toBe(false);
+  });
+
+  it('reverts a centralized MCP server by removing it from the registry', async () => {
+    const serverA: McpServerManifest = {
+      id: 'gemini:server-a',
+      name: 'server-a',
+      transport: 'stdio',
+      command: 'echo',
+      args: ['a'],
+      declaredToolsCount: 1,
+    };
+    const serverB: McpServerManifest = {
+      id: 'gemini:server-b',
+      name: 'server-b',
+      transport: 'stdio',
+      command: 'echo',
+      args: ['b'],
+      declaredToolsCount: 1,
+    };
+
+    await centralizeMcpServer(serverA, customHome);
+    await centralizeMcpServer(serverB, customHome);
+
+    const initialRegistry = await loadMcpRegistry(customHome);
+    expect(Object.keys(initialRegistry)).toHaveLength(2);
+
+    const reverted = await revertMcpServer('server-a', customHome);
+    expect(reverted.name).toBe('server-a');
+    expect(reverted.status).toBe('original');
+
+    const updatedRegistry = await loadMcpRegistry(customHome);
+    expect(updatedRegistry['server-a']).toBeUndefined();
+    expect(updatedRegistry['server-b']).toBeDefined();
   });
 });
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './index.css';
 import { SkillManifest, McpServerManifest, WorkflowManifest } from '../../core/types.js';
-import { ConflictReport, ResolutionPayload } from '../../core/conflict/types.js';
+import { ConflictReport } from '../../core/conflict/types.js';
 import { DiscoveryTable } from './components/DiscoveryTable.js';
 import { FlashNotification } from './components/FlashNotification.js';
 import { McpServerList } from './components/McpServerList.js';
@@ -12,11 +12,13 @@ import { AppDetailViews } from './components/AppDetailViews.js';
 import { BackupModal } from './components/BackupModal.js';
 import { VaultDrawer } from './components/VaultDrawer.js';
 import { SettingsView } from './components/SettingsView.js';
+import { RouterLogView } from './components/RouterLogView.js';
 import { AppTabNavigation, Tab } from './components/AppTabNavigation.js';
 import { initialSkills, initialMcp, initialWorkflows } from './mockData.js';
 import { useInventoryActions } from './hooks/useInventoryActions.js';
 import { useBackupAndVault } from './hooks/useBackupAndVault.js';
 import { useEntityToggles } from './hooks/useEntityToggles.js';
+import { useConflictResolver } from './hooks/useConflictResolver.js';
 
 export default function App(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<Tab>('skills');
@@ -25,6 +27,7 @@ export default function App(): React.ReactElement {
   const [mcpServers, setMcpServers] = useState<McpServerManifest[]>(initialMcp);
   const [workflows, setWorkflows] = useState<WorkflowManifest[]>(initialWorkflows);
   const [conflicts, setConflicts] = useState<ConflictReport[]>([]);
+  const [logsCount, setLogsCount] = useState<number>(0);
   const [selectedConflict, setSelectedConflict] = useState<ConflictReport | null>(null);
   const [selectedSkill, setSelectedSkill] = useState<SkillManifest | null>(null);
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowManifest | null>(null);
@@ -78,6 +81,14 @@ export default function App(): React.ReactElement {
           setSelectedConflict((prev) => (prev ? confData.conflicts.find((c: ConflictReport) => c.id === prev.id) || null : null));
         }
       }
+      fetch('/api/router/status')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d?.metrics?.totalTransactions !== undefined) {
+            setLogsCount(d.metrics.totalTransactions);
+          }
+        })
+        .catch(() => {});
       setIsConnected(true);
     } catch {
       setIsConnected(false);
@@ -100,6 +111,7 @@ export default function App(): React.ReactElement {
     handleCentralizeWorkflow,
     handleRevertWorkflow,
     handleCentralizeMcp,
+    handleRevertMcp,
     handleToggleMcp,
     handleGenerateMcpSubset,
     handleQueryMcpTools,
@@ -134,25 +146,11 @@ export default function App(): React.ReactElement {
     handleSaveSecret,
   } = useBackupAndVault(fetchInventory);
 
-  const handleResolveConflict = async (payload: ResolutionPayload) => {
-    try {
-      const res = await fetch('/api/conflicts/resolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setFlash({ type: 'success', message: data.message || 'Conflict resolved successfully' });
-        setSelectedConflict(null);
-        await fetchInventory();
-      } else {
-        setFlash({ type: 'danger', message: data.error || 'Failed to resolve conflict' });
-      }
-    } catch (err: any) {
-      setFlash({ type: 'danger', message: err.message || 'Failed to resolve conflict' });
-    }
-  };
+  const { handleResolveConflict } = useConflictResolver({
+    setFlash,
+    setSelectedConflict,
+    fetchInventory,
+  });
 
   const hasDetailSelected = Boolean(selectedSkill || selectedWorkflow || selectedMcp);
 
@@ -199,6 +197,7 @@ export default function App(): React.ReactElement {
             onToggleWorkflow={handleToggleWorkflow}
             onToggleMcp={handleToggleMcp}
             onCentralizeMcp={handleCentralizeMcp}
+            onRevertMcp={handleRevertMcp}
             onQueryTools={handleQueryMcpTools}
             onDiscoverMcp={handleDiscoverMcp}
           />
@@ -211,6 +210,7 @@ export default function App(): React.ReactElement {
               workflowsCount={workflows.length}
               mcpCount={mcpServers.length}
               conflictsCount={conflicts.length}
+              logsCount={logsCount}
             />
 
             {activeTab === 'skills' && (
@@ -240,6 +240,7 @@ export default function App(): React.ReactElement {
                 onGenerateSubset={handleGenerateMcpSubset}
                 onToggleEnabled={handleToggleMcp}
                 onCentralizeServer={handleCentralizeMcp}
+                onRevertServer={handleRevertMcp}
                 onDiscoverServer={handleDiscoverMcp}
               />
             )}
@@ -249,6 +250,7 @@ export default function App(): React.ReactElement {
                 onSelectConflict={(conflict) => setSelectedConflict(conflict)}
               />
             )}
+            {activeTab === 'logs' && <RouterLogView />}
             {activeTab === 'settings' && (
               <SettingsView
                 onOpenBackup={() => setIsBackupOpen(true)}

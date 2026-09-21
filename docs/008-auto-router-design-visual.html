@@ -1,0 +1,866 @@
+<!--
+Topic: KoSkill Auto-Router & Meta-MCP Server
+Reflects Settled Decisions:
+- Q1 Settled: Interactive Web UI toggle with dry-run preview and .disabled renaming
+- Q2 Settled: Lazy on-demand child MCP spawn with 5m idle reaper and max 5 concurrency
+- Q3 Settled: Hybrid Search Engine (sqlite-vec + SQLite FTS5 RRF ranking)
+- Q4 Settled: Multi-agent auto-detection (Antigravity GEMINI.md, Claude CLAUDE.md, Cursor)
+- Q5 Settled: Strict 15s per-call timeout with child auto-restart on corruption
+- Q6 Settled: load_skill returns core SKILL.md plus directory index of companions
+- Q7 Settled: File-based SQLite/JSONL WAL buffer in ~/.koskill/cache/router_tx.log
+- Q8 Settled: Dynamic catalog delta token savings formula
+- Q9 Settled: Agent restart guidance toast modal upon toggle
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KoSkill Auto-Router Visual</title>
+<style>
+:root {
+  --color-canvas-default: #ffffff;
+  --color-canvas-subtle: #f6f8fa;
+  --color-border-default: #d0d7de;
+  --color-border-muted: hsla(210,18%,87%,1);
+  --color-fg-default: #1f2328;
+  --color-fg-muted: #656d76;
+  --color-fg-subtle: #6e7781;
+  --color-accent-fg: #0969da;
+  --color-accent-emphasis: #0969da;
+  --color-accent-subtle: #ddf4ff;
+  --color-success-fg: #1a7f37;
+  --color-success-emphasis: #1f883d;
+  --color-success-subtle: #dafbe1;
+  --color-attention-fg: #9a6700;
+  --color-attention-subtle: #fff8c5;
+  --color-danger-fg: #cf222e;
+  --color-danger-subtle: #ffebe9;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+[data-theme="dark"] {
+  --color-canvas-default: #0d1117;
+  --color-canvas-subtle: #161b22;
+  --color-border-default: #30363d;
+  --color-border-muted: #21262d;
+  --color-fg-default: #e6edf3;
+  --color-fg-muted: #848d97;
+  --color-fg-subtle: #7d8590;
+  --color-accent-fg: #4493f8;
+  --color-accent-emphasis: #1f6feb;
+  --color-accent-subtle: rgba(56,139,253,0.15);
+  --color-success-fg: #3fb950;
+  --color-success-emphasis: #238636;
+  --color-success-subtle: rgba(46,160,67,0.15);
+  --color-attention-fg: #d29922;
+  --color-attention-subtle: rgba(187,128,9,0.15);
+  --color-danger-fg: #f85149;
+  --color-danger-subtle: rgba(248,81,73,0.15);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-canvas-subtle);
+  color: var(--color-fg-default);
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.top-bar {
+  background: var(--color-canvas-default);
+  border-bottom: 1px solid var(--color-border-default);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-icon {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #0969da, #1a7f37);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+}
+.brand-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.brand-tag {
+  font-size: 11px;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-fg);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+.view-switchers {
+  display: flex;
+  gap: 6px;
+  background: var(--color-canvas-subtle);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  padding: 3px;
+}
+.view-btn {
+  background: none;
+  border: none;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.view-btn.active {
+  background: var(--color-canvas-default);
+  color: var(--color-fg-default);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--color-border-default);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-fg-default);
+  cursor: pointer;
+}
+
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.settled-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-success-subtle);
+  color: var(--color-success-fg);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.arch-card {
+  background: var(--color-canvas-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.section-subtitle {
+  color: var(--color-fg-muted);
+  font-size: 12px;
+  margin-bottom: 20px;
+}
+
+.arch-flow {
+  display: grid;
+  grid-template-columns: 240px 1fr 240px;
+  gap: 20px;
+  align-items: start;
+}
+.node-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.node-box {
+  background: var(--color-canvas-subtle);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  padding: 14px;
+  position: relative;
+}
+.node-box.highlight {
+  border-color: var(--color-accent-fg);
+  box-shadow: 0 0 0 1px var(--color-accent-fg);
+  background: var(--color-canvas-default);
+}
+.node-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.node-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+.node-desc {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  line-height: 1.4;
+}
+.node-meta {
+  margin-top: 8px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--color-fg-subtle);
+  background: var(--color-canvas-default);
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border-muted);
+}
+
+.UnderlineNav {
+  display: flex;
+  border-bottom: 1px solid var(--color-border-default);
+  margin-bottom: 16px;
+  gap: 8px;
+}
+.UnderlineNav-item {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.UnderlineNav-item:hover {
+  color: var(--color-fg-default);
+}
+.UnderlineNav-item.selected {
+  color: var(--color-fg-default);
+  border-bottom-color: var(--color-accent-emphasis);
+  font-weight: 600;
+}
+.Counter {
+  background: var(--color-canvas-subtle);
+  border: 1px solid var(--color-border-default);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+.Counter.active {
+  background: var(--color-accent-emphasis);
+  color: #fff;
+  border-color: transparent;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.metric-card {
+  background: var(--color-canvas-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  padding: 14px 18px;
+}
+.metric-label {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-fg-default);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.metric-sub {
+  font-size: 12px;
+  color: var(--color-success-fg);
+  font-weight: 500;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+.search-input {
+  flex: 1;
+  background: var(--color-canvas-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--color-fg-default);
+}
+.btn-sm {
+  background: var(--color-canvas-default);
+  border: 1px solid var(--color-border-default);
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-fg-default);
+  cursor: pointer;
+}
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-success-fg);
+  background: var(--color-success-subtle);
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-success-fg);
+}
+
+.table-card {
+  background: var(--color-canvas-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  overflow: hidden;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+th {
+  background: var(--color-canvas-subtle);
+  border-bottom: 1px solid var(--color-border-default);
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+}
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-muted);
+}
+tr:hover {
+  background: var(--color-canvas-subtle);
+  cursor: pointer;
+}
+.badge-action {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.badge-discover { background: #ddf4ff; color: #0969da; }
+.badge-invoke { background: #dafbe1; color: #1a7f37; }
+.badge-load { background: #fff8c5; color: #9a6700; }
+.chip-ms {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+.chip-tokens {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-success-fg);
+  font-weight: 600;
+}
+
+.drawer {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 440px;
+  background: var(--color-canvas-default);
+  border-left: 1px solid var(--color-border-default);
+  box-shadow: -4px 0 16px rgba(0,0,0,0.1);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+}
+.drawer.hidden { display: none; }
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-default);
+}
+.drawer-title { font-size: 15px; font-weight: 600; }
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--color-fg-muted);
+}
+.code-block {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--color-canvas-subtle);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  line-height: 1.4;
+}
+
+.settings-box {
+  background: var(--color-canvas-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border-default);
+  margin-bottom: 16px;
+}
+.toggle-info h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.toggle-info p { font-size: 12px; color: var(--color-fg-muted); }
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: var(--color-border-default);
+  transition: .2s;
+  border-radius: 24px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .2s;
+  border-radius: 50%;
+}
+input:checked + .slider { background-color: var(--color-success-emphasis); }
+input:checked + .slider:before { transform: translateX(20px); }
+
+.preview-table {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.preview-table td { padding: 6px 8px; }
+.op-rename { color: var(--color-attention-fg); font-weight: 600; }
+.op-rule { color: var(--color-accent-fg); font-weight: 600; }
+
+.toast-modal {
+  background: var(--color-canvas-subtle);
+  border: 1px solid var(--color-border-default);
+  border-left: 4px solid var(--color-accent-fg);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-top: 14px;
+  font-size: 12px;
+}
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <div class="brand">
+    <div class="logo-icon">K</div>
+    <span class="brand-title">KoSkill</span>
+    <span class="brand-tag">v0.9.0</span>
+  </div>
+
+  <div class="view-switchers">
+    <button class="view-btn active" id="btnViewArch" onclick="switchView('arch')">Architecture Flow</button>
+    <button class="view-btn" id="btnViewLogs" onclick="switchView('logs')">UI Prototype: Logs Tab</button>
+    <button class="view-btn" id="btnViewSettings" onclick="switchView('settings')">UI Prototype: Auto-Router Settings</button>
+  </div>
+
+  <button class="theme-toggle" onclick="toggleTheme()">Theme</button>
+</header>
+
+<main class="container">
+
+  <!-- VIEW 1: ARCHITECTURE FLOW -->
+  <section id="viewArch">
+    <div class="arch-card">
+      <div class="section-title">KoSkill Auto-Router Architecture & Data Flow</div>
+      <div class="section-subtitle">Zero-prompt token bloat through dynamic capability routing, lazy proxy pooling, and live WAL logging</div>
+
+      <div class="arch-flow">
+        <!-- Col 1: Upstream Agents -->
+        <div class="node-column">
+          <div style="font-size: 11px; font-weight: 700; color: var(--color-fg-muted); text-transform: uppercase;">Upstream Agents</div>
+          <div class="node-box highlight">
+            <div class="node-header">
+              <span class="node-title">AI Coding Assistant</span>
+              <span class="settled-tag">Q4 Settled</span>
+            </div>
+            <div class="node-desc">Gemini (AGY), Claude Code, or Cursor configured with exactly 3 meta-tools.</div>
+            <div class="node-meta">Rules: <!-- KOSKILL_ROUTER_START --></div>
+          </div>
+
+          <div style="text-align: center; color: var(--color-fg-muted); font-size: 18px;">⬇️ stdio (JSON-RPC)</div>
+
+          <div class="node-box highlight">
+            <div class="node-header">
+              <span class="node-title">Meta-MCP Server</span>
+              <span class="settled-tag">Single Endpoint</span>
+            </div>
+            <div class="node-desc">Executable: <code>koskill router run</code>. Handles discovery, tool proxying, and skill retrieval.</div>
+            <div class="node-meta">discover_capabilities<br/>invoke_tool<br/>load_skill</div>
+          </div>
+        </div>
+
+        <!-- Col 2: Core Routing & Subsystems -->
+        <div class="node-column">
+          <div style="font-size: 11px; font-weight: 700; color: var(--color-fg-muted); text-transform: uppercase;">Router Engine & Local Services</div>
+
+          <div class="node-box">
+            <div class="node-header">
+              <span class="node-title">1. Hybrid Search Engine</span>
+              <span class="settled-tag">Q3 Settled</span>
+            </div>
+            <div class="node-desc">Reciprocal Rank Fusion (RRF) combining dense <code>sqlite-vec</code> cosine similarity + SQLite FTS5 BM25. Latency &lt; 30ms.</div>
+            <div class="node-meta">~/.koskill/cache/index.db</div>
+          </div>
+
+          <div class="node-box">
+            <div class="node-header">
+              <span class="node-title">2. Downstream MCP Proxy Pool</span>
+              <span class="settled-tag">Q2 & Q5 Settled</span>
+            </div>
+            <div class="node-desc">Lazy child process spawning. 5-min idle reaper, max 5 active servers. 15s execution timeout with auto-restart on pipe corruption.</div>
+            <div class="node-meta">Lazy Pool: chrome-devtools, github, etc.</div>
+          </div>
+
+          <div class="node-box">
+            <div class="node-header">
+              <span class="node-title">3. Central Skill Store</span>
+              <span class="settled-tag">Q6 Settled</span>
+            </div>
+            <div class="node-desc">Loads <code>SKILL.md</code> instructions directly with companion directory index for references/scripts.</div>
+            <div class="node-meta">~/.koskill/skills & ~/.koskill/workflows</div>
+          </div>
+        </div>
+
+        <!-- Col 3: Logging & UI -->
+        <div class="node-column">
+          <div style="font-size: 11px; font-weight: 700; color: var(--color-fg-muted); text-transform: uppercase;">Telemetry & Web UI</div>
+
+          <div class="node-box">
+            <div class="node-header">
+              <span class="node-title">Router Transaction WAL</span>
+              <span class="settled-tag">Q7 Settled</span>
+            </div>
+            <div class="node-desc">Zero-network disk buffer capturing duration, token savings, query, and tool payloads across processes.</div>
+            <div class="node-meta">~/.koskill/cache/router_tx.log</div>
+          </div>
+
+          <div style="text-align: center; color: var(--color-fg-muted); font-size: 18px;">⬇️ SSE / REST</div>
+
+          <div class="node-box highlight">
+            <div class="node-header">
+              <span class="node-title">KoSkill UI: Logs Tab</span>
+              <span class="settled-tag">Q8 Settled</span>
+            </div>
+            <div class="node-desc">Live streaming transaction monitor with cumulative token savings delta metrics and payload drawers.</div>
+            <div class="node-meta">GET /api/router/stream</div>
+          </div>
+
+          <div class="node-box">
+            <div class="node-header">
+              <span class="node-title">Settings Toggle & Dry-Run</span>
+              <span class="settled-tag">Q1 & Q9 Settled</span>
+            </div>
+            <div class="node-desc">UI toggle with dry-run preview and agent restart guidance toast modal.</div>
+            <div class="node-meta">Settings -> Auto-Router</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEW 2: LOGS TAB PROTOTYPE -->
+  <section id="viewLogs" style="display: none;">
+    <nav class="UnderlineNav">
+      <button class="UnderlineNav-item">Skills <span class="Counter">18</span></button>
+      <button class="UnderlineNav-item">Workflows <span class="Counter">6</span></button>
+      <button class="UnderlineNav-item">MCP Servers <span class="Counter">8</span></button>
+      <button class="UnderlineNav-item">Conflicts <span class="Counter">0</span></button>
+      <button class="UnderlineNav-item selected">Logs <span class="Counter active">1048</span></button>
+      <button class="UnderlineNav-item" onclick="switchView('settings')">Settings</button>
+    </nav>
+
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Active Child Servers</div>
+        <div class="metric-value">2 <span class="metric-sub">/ 5 max pool (Q2 settled)</span></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Total Invocations</div>
+        <div class="metric-value">1,048 <span class="metric-sub">100% routed</span></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Estimated Tokens Saved</div>
+        <div class="metric-value">482,150 <span class="metric-sub">94.2% context spared (Q8 settled)</span></div>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <input type="text" class="search-input" placeholder="Filter by action, target tool, query, or payload...">
+      <button class="btn-sm">Category: All</button>
+      <button class="btn-sm">Auto-scroll: ON</button>
+      <button class="btn-sm">Clear</button>
+      <span class="live-badge"><span class="pulse-dot"></span> Live SSE Stream</span>
+    </div>
+
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Action</th>
+            <th>Target / Query</th>
+            <th>Latency</th>
+            <th>Tokens Saved</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="logsTbody">
+          <tr onclick="openDrawer('tx-1')">
+            <td>20:41:04.120</td>
+            <td><span class="badge-action badge-discover">DISCOVER</span></td>
+            <td><strong>query:</strong> "audit web accessibility guidelines"</td>
+            <td><span class="chip-ms">18ms</span></td>
+            <td><span class="chip-tokens">+14,200 tok</span></td>
+            <td><span class="settled-tag">SUCCESS</span></td>
+          </tr>
+          <tr onclick="openDrawer('tx-2')">
+            <td>20:41:06.840</td>
+            <td><span class="badge-action badge-load">LOAD_SKILL</span></td>
+            <td><strong>skill:</strong> "accessibility" (SKILL.md + 4 companion refs)</td>
+            <td><span class="chip-ms">4ms</span></td>
+            <td><span class="chip-tokens">+8,600 tok</span></td>
+            <td><span class="settled-tag">SUCCESS</span></td>
+          </tr>
+          <tr onclick="openDrawer('tx-3')">
+            <td>20:41:15.310</td>
+            <td><span class="badge-action badge-invoke">INVOKE_TOOL</span></td>
+            <td><strong>chrome-devtools:</strong> click(selector="#submit-btn")</td>
+            <td><span class="chip-ms">84ms</span></td>
+            <td><span class="chip-tokens">+32,100 tok</span></td>
+            <td><span class="settled-tag">SUCCESS</span></td>
+          </tr>
+          <tr onclick="openDrawer('tx-4')">
+            <td>20:41:22.015</td>
+            <td><span class="badge-action badge-invoke">INVOKE_TOOL</span></td>
+            <td><strong>github:</strong> list_issues(repo="koskill", state="open")</td>
+            <td><span class="chip-ms">142ms</span></td>
+            <td><span class="chip-tokens">+28,400 tok</span></td>
+            <td><span class="settled-tag">SUCCESS</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- VIEW 3: SETTINGS PROTOTYPE -->
+  <section id="viewSettings" style="display: none;">
+    <nav class="UnderlineNav">
+      <button class="UnderlineNav-item" onclick="switchView('logs')">Skills <span class="Counter">18</span></button>
+      <button class="UnderlineNav-item">Workflows <span class="Counter">6</span></button>
+      <button class="UnderlineNav-item">MCP Servers <span class="Counter">8</span></button>
+      <button class="UnderlineNav-item">Conflicts <span class="Counter">0</span></button>
+      <button class="UnderlineNav-item" onclick="switchView('logs')">Logs <span class="Counter">1048</span></button>
+      <button class="UnderlineNav-item selected">Settings</button>
+    </nav>
+
+    <div class="settings-box">
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <h3>KoSkill Auto-Router & Meta-MCP Server</h3>
+          <p>Replaces manual skill symlinks with on-demand hybrid capability routing. Prevents context window exhaustion.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" checked onchange="toggleRouter(this)">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">
+        Dry-Run Preview & Active Changes <span class="settled-tag">Q1 Settled</span>
+      </div>
+      <div style="background: var(--color-canvas-subtle); border: 1px solid var(--color-border-default); border-radius: 6px; padding: 10px;">
+        <table class="preview-table">
+          <tr>
+            <td class="op-rename">RENAME</td>
+            <td>~/.gemini/config/skills/accessibility &rarr; <code>accessibility.disabled</code></td>
+          </tr>
+          <tr>
+            <td class="op-rename">RENAME</td>
+            <td>~/.gemini/config/skills/clean-code &rarr; <code>clean-code.disabled</code></td>
+          </tr>
+          <tr>
+            <td class="op-rule">INJECT RULE</td>
+            <td>~/.gemini/config/GEMINI.md &rarr; injected <code>&lt;!-- KOSKILL_ROUTER_START --&gt;</code> block</td>
+          </tr>
+          <tr>
+            <td class="op-rule">REGISTER MCP</td>
+            <td>~/.gemini/config/mcp_config.json &rarr; <code>koskill-router (koskill router run)</code></td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="toast-modal">
+        <strong>Agent Restart Guidance <span class="settled-tag">Q9 Settled</span></strong>
+        <p style="margin-top: 4px; color: var(--color-fg-muted);">
+          Changes applied successfully. Because running IDE processes do not reload MCP pipes mid-session, please reload your agent:
+          <br/><strong>Antigravity / Gemini:</strong> Restart active IDE task / session.
+          <br/><strong>Claude Code:</strong> Run <code>/compact</code> or restart terminal session.
+        </p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="drawer" class="drawer hidden">
+  <div class="drawer-header">
+    <span class="drawer-title" id="drawerTitle">Transaction Details</span>
+    <button class="close-btn" onclick="closeDrawer()">&times;</button>
+  </div>
+  <div style="margin-bottom: 12px;">
+    <div style="font-size: 11px; color: var(--color-fg-muted); margin-bottom: 4px;">TRANSACTION ID</div>
+    <div style="font-family: var(--font-mono); font-size: 12px;" id="drawerTxId">tx-1</div>
+  </div>
+  <div style="margin-bottom: 12px;">
+    <div style="font-size: 11px; color: var(--color-fg-muted); margin-bottom: 4px;">PAYLOAD & ARGUMENTS</div>
+    <div class="code-block" id="drawerPayload"></div>
+  </div>
+  <div>
+    <div style="font-size: 11px; color: var(--color-fg-muted); margin-bottom: 4px;">RESULT / RETURNED CAPABILITIES</div>
+    <div class="code-block" id="drawerResult"></div>
+  </div>
+</div>
+
+<script>
+function switchView(view) {
+  document.getElementById('viewArch').style.display = view === 'arch' ? 'block' : 'none';
+  document.getElementById('viewLogs').style.display = view === 'logs' ? 'block' : 'none';
+  document.getElementById('viewSettings').style.display = view === 'settings' ? 'block' : 'none';
+
+  document.getElementById('btnViewArch').classList.toggle('active', view === 'arch');
+  document.getElementById('btnViewLogs').classList.toggle('active', view === 'logs');
+  document.getElementById('btnViewSettings').classList.toggle('active', view === 'settings');
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  document.documentElement.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+}
+
+const mockTx = {
+  'tx-1': {
+    id: 'tx-1-8f92b',
+    action: 'DISCOVER',
+    query: 'audit web accessibility guidelines',
+    durationMs: 18,
+    tokensSaved: 14200,
+    payload: JSON.stringify({
+      action: "discover_capabilities",
+      query: "audit web accessibility guidelines",
+      category: "skill",
+      limit: 3
+    }, null, 2),
+    result: JSON.stringify({
+      candidates: [
+        { id: "accessibility", type: "skill", score: 0.94, desc: "Audit and improve web accessibility following WCAG 2.2" },
+        { id: "a11y-debugging", type: "skill", score: 0.88, desc: "Uses Chrome DevTools for a11y auditing" }
+      ],
+      tokensReturned: 180,
+      totalCatalogTokens: 14380,
+      tokensSavedEstimate: 14200
+    }, null, 2)
+  },
+  'tx-3': {
+    id: 'tx-3-4a11c',
+    action: 'INVOKE_TOOL',
+    server: 'chrome-devtools',
+    tool: 'click',
+    durationMs: 84,
+    tokensSaved: 32100,
+    payload: JSON.stringify({
+      server: "chrome-devtools",
+      tool: "click",
+      arguments: { selector: "#submit-btn" }
+    }, null, 2),
+    result: JSON.stringify({
+      status: "SUCCESS",
+      output: { ok: true, clicked: true, nodeId: 4192 },
+      proxyOverheadMs: 4,
+      serverExecutionMs: 80
+    }, null, 2)
+  }
+};
+
+function openDrawer(id) {
+  const data = mockTx[id] || mockTx['tx-1'];
+  document.getElementById('drawerTxId').textContent = data.id + ' (' + data.action + ')';
+  document.getElementById('drawerPayload').textContent = data.payload;
+  document.getElementById('drawerResult').textContent = data.result;
+  document.getElementById('drawer').classList.remove('hidden');
+}
+
+function closeDrawer() {
+  document.getElementById('drawer').classList.add('hidden');
+}
+
+function toggleRouter(checkbox) {
+  if (!checkbox.checked) {
+    alert("Auto-Router Disabled: Restoring original symlinks in ~/.gemini/config/skills and cleaning GEMINI.md rules.");
+  } else {
+    alert("Auto-Router Enabled: Safe dry-run executed. Renamed symlinks to .disabled and injected router instructions.");
+  }
+}
+</script>
+</body>
+</html>

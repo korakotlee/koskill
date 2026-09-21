@@ -17,6 +17,7 @@ export interface AppDetailViewsProps {
   onToggleWorkflow?: (workflow: WorkflowManifest, enabled: boolean) => void;
   onToggleMcp: (server: McpServerManifest, enabled: boolean) => void;
   onCentralizeMcp: (server: McpServerManifest) => void;
+  onRevertMcp?: (server: McpServerManifest) => void;
   onQueryTools: (server: McpServerManifest) => void;
   onDiscoverMcp: (server: McpServerManifest) => void;
 }
@@ -37,6 +38,7 @@ export const AppDetailViews: React.FC<AppDetailViewsProps> = ({
   onToggleWorkflow,
   onToggleMcp,
   onCentralizeMcp,
+  onRevertMcp,
   onQueryTools,
   onDiscoverMcp,
 }) => {
@@ -71,6 +73,7 @@ export const AppDetailViews: React.FC<AppDetailViewsProps> = ({
         onBack={onClearSelection}
         onToggleEnabled={onToggleMcp}
         onCentralize={onCentralizeMcp}
+        onRevert={onRevertMcp}
         onQueryTools={onQueryTools}
         onDiscoverServer={onDiscoverMcp}
       />

@@ -1,7 +1,6 @@
 import { scanAllInventory } from '../../core/scanner/index.js';
 import {
   loadMcpRegistry,
-  centralizeMcpServer,
   updateServerDiscoveryMetadata,
 } from '../../core/storage/mcp-store.js';
 import { discoverMcpServer } from '../../core/mcp/mcp-client.js';
@@ -45,9 +44,6 @@ export class McpDiscoveryService {
       throw new Error(`MCP server '${serverName}' has no command configured`);
     }
 
-    // Ensure server is registered in central store so metadata updates persist
-    await centralizeMcpServer(base, customHome);
-
     defaultLogger.info('Starting live discovery for MCP server', { serverName, command: base.command });
 
     const discovery = await discoverMcpServer({
@@ -57,13 +53,26 @@ export class McpDiscoveryService {
       timeoutMs: 6000,
     });
 
-    const updated = await updateServerDiscoveryMetadata(
-      base.name,
-      discovery,
-      customHome
-    );
+    if (registered) {
+      return await updateServerDiscoveryMetadata(
+        base.name,
+        discovery,
+        customHome
+      );
+    }
 
-    return updated;
+    return {
+      ...base,
+      title: discovery.title ?? base.title,
+      version: discovery.version ?? base.version,
+      description: discovery.description ?? base.description,
+      instructions: discovery.instructions ?? base.instructions,
+      serverInfo: discovery.serverInfo ?? base.serverInfo,
+      status: 'original',
+      tools: discovery.tools && discovery.tools.length > 0 ? discovery.tools : base.tools,
+      declaredToolsCount: discovery.tools && discovery.tools.length > 0 ? discovery.tools.length : base.declaredToolsCount,
+      lastDiscoveredAt: new Date().toISOString(),
+    };
   }
 
   /**

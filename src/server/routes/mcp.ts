@@ -3,6 +3,7 @@ import { scanAllInventory } from '../../core/scanner/index.js';
 import {
   loadMcpRegistry,
   centralizeMcpServer,
+  revertMcpServer,
   toggleMcpServer,
   generateAgentsMcpSubset,
   discoverServerTools,
@@ -12,28 +13,7 @@ import { queryMcpServerTools } from '../../core/mcp/mcp-client.js';
 import { defaultDiscoveryService } from '../services/mcp-discovery-service.js';
 import { defaultLogger } from '../../core/logger.js';
 import { McpServerManifest } from '../../core/types.js';
-
-async function parseJsonBody<T = any>(req: http.IncomingMessage): Promise<T> {
-  return new Promise((resolve, reject) => {
-    let raw = '';
-    req.on('data', (chunk) => {
-      raw += chunk;
-      if (raw.length > 1e6) reject(new Error('Payload too large'));
-    });
-    req.on('end', () => {
-      if (!raw.trim()) {
-        resolve({} as T);
-        return;
-      }
-      try {
-        resolve(JSON.parse(raw));
-      } catch {
-        reject(new Error('Invalid JSON payload'));
-      }
-    });
-    req.on('error', reject);
-  });
-}
+import { parseJsonBody } from '../utils.js';
 
 /**
  * Handles incoming HTTP requests for MCP servers, registry, and tool inspection.
@@ -178,6 +158,22 @@ export async function handleMcpRoutes(
     }
   }
 
+  // POST /api/mcp/:name/revert
+  if (req.method === 'POST' && url.pathname.startsWith('/api/mcp/') && url.pathname.endsWith('/revert')) {
+    const serverName = decodeURIComponent(url.pathname.slice('/api/mcp/'.length, -('/revert'.length)));
+    try {
+      const reverted = await revertMcpServer(serverName);
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, server: reverted }));
+      return true;
+    } catch (err: any) {
+      const status = err.message.includes('not found') ? 404 : 500;
+      res.writeHead(status);
+      res.end(JSON.stringify({ error: err.message }));
+      return true;
+    }
+  }
+
   // POST /api/mcp/:name/toggle
   if (req.method === 'POST' && url.pathname.startsWith('/api/mcp/') && url.pathname.endsWith('/toggle')) {
     const serverName = decodeURIComponent(url.pathname.slice('/api/mcp/'.length, -('/toggle'.length)));
@@ -235,12 +231,17 @@ export async function handleMcpRoutes(
         timeoutMs: 8000,
       });
 
-      // Ensure centralized in registry so tools persist
-      if (!registered && scanned) {
-        await centralizeMcpServer(scanned);
+      let updated: McpServerManifest;
+      if (registered) {
+        updated = await updateServerTools(serverName, tools);
+      } else {
+        updated = {
+          ...base,
+          status: 'original',
+          tools,
+          declaredToolsCount: tools.length,
+        };
       }
-
-      const updated = await updateServerTools(serverName, tools);
       res.writeHead(200);
       res.end(JSON.stringify({ success: true, server: updated, tools, count: tools.length }));
       return true;

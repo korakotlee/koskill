@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type Tab = 'skills' | 'workflows' | 'mcp' | 'conflicts' | 'settings';
+export type Tab = 'skills' | 'workflows' | 'mcp' | 'conflicts' | 'logs' | 'settings';
 
 export interface AppTabNavigationProps {
   activeTab: Tab;
@@ -9,6 +9,7 @@ export interface AppTabNavigationProps {
   workflowsCount: number;
   mcpCount: number;
   conflictsCount: number;
+  logsCount?: number;
 }
 
 /**
@@ -21,6 +22,7 @@ export const AppTabNavigation: React.FC<AppTabNavigationProps> = ({
   workflowsCount,
   mcpCount,
   conflictsCount,
+  logsCount = 0,
 }) => {
   return (
     <nav className="UnderlineNav" aria-label="Ecosystem Views" style={{ marginBottom: '20px' }}>
@@ -61,6 +63,13 @@ export const AppTabNavigation: React.FC<AppTabNavigationProps> = ({
         >
           {conflictsCount}
         </span>
+      </button>
+      <button
+        type="button"
+        className={`UnderlineNav-item ${activeTab === 'logs' ? 'selected' : ''}`}
+        onClick={() => onSelectTab('logs')}
+      >
+        Logs <span className={`Counter ${logsCount ? 'active' : ''}`}>{logsCount ?? 0}</span>
       </button>
       <button
         type="button"

@@ -75,6 +75,21 @@ describe('McpDetailView Component', () => {
     expect(onCentralize).toHaveBeenCalledWith(sampleMcp);
   });
 
+  it('handles revert button trigger when server is centralized', async () => {
+    const centralizedMcp: McpServerManifest = {
+      ...sampleMcp,
+      status: 'centralized',
+    };
+    const onRevert = vi.fn();
+    render(<McpDetailView server={centralizedMcp} onBack={vi.fn()} onRevert={onRevert} />);
+
+    const revertBtn = screen.getByRole('button', { name: /Revert to Original/i });
+    expect(revertBtn).toBeDefined();
+
+    fireEvent.click(revertBtn);
+    expect(onRevert).toHaveBeenCalledWith(centralizedMcp);
+  });
+
   it('automatically triggers onQueryTools when server has 0 tools', async () => {
     const emptyServer: McpServerManifest = {
       ...sampleMcp,

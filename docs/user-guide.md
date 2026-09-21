@@ -13,7 +13,8 @@ This guide covers setup, discovery workflows, and the Conflict Detection and Res
 5. [Backup & Restore Packaging](#5-backup--restore-packaging)
 6. [Local Credential Vault](#6-local-credential-vault)
 7. [Central Store & Symlink Management](#7-central-store--symlink-management)
-8. [Troubleshooting & Logs](#8-troubleshooting--logs)
+8. [Auto-Router & Meta-MCP Server](#8-auto-router--meta-mcp-server)
+9. [Troubleshooting & Logs](#9-troubleshooting--logs)
 
 ---
 
@@ -112,12 +113,62 @@ Centralize items into `~/.koskill/` to synchronize prompts across multiple AI ag
 
 ---
 
-## 8. Troubleshooting & Logs
+## 8. Auto-Router & Meta-MCP Server
+
+The Auto-Router drastically slashes agent context window bloat by replacing dozens of registered tools with three dynamic meta-tools: `discover_capabilities`, `invoke_tool`, and `load_skill`.
+
+### Key Benefits
+
+- **Token Consumption Drop**: Saves up to 87% of context window tokens per agent interaction cycle.
+- **Dynamic Routing**: Discovers skills, workflows, and tool capabilities on demand via local hybrid search (`sqlite-vec` + BM25).
+- **Zero Configuration Burden**: Agents invoke tools through `invoke_tool` without pre-registering huge JSON schemas.
+
+### Enabling the Auto-Router
+
+1. Open the **Settings** tab in the KoSkill dashboard.
+2. In the **Auto-Router & Meta-MCP Server** card, click the toggle switch to enable or disable the router.
+3. A **Dry-Run Confirmation Modal** will appear detailing the planned filesystem modifications:
+   - Automatic registration of `"koskill-router"` in active MCP configurations (`~/.gemini/antigravity-ide/mcp_config.json`, `~/.gemini/config/mcp_config.json`, `~/.claude/mcp.json`).
+   - Delegation of **Centralized MCP servers** (`~/.koskill/mcp/servers.json`) downstream by setting `disabled: true`.
+   - Preservation of **Normal MCP servers** (unmanaged original servers remain enabled and available directly in AGY-IDE).
+   - Injection or removal of the router prompt instruction block (`<!-- KOSKILL_ROUTER_START -->`) in `~/.gemini/GEMINI.md` or `~/.claude/CLAUDE.md`.
+   - Renaming or unlinking of downstream configuration symlinks.
+4. Click **Apply Changes** to execute the takeover atomically.
+5. After toggling, restart your active CLI agent sessions (`gemini` or `claude`) so they reload the updated prompt instructions and tool definitions.
+
+### Running the Meta-MCP Server via CLI
+
+You can directly launch the Auto-Router Meta-MCP server over stdio for agent configurations:
+
+```bash
+koskill router run
+```
+
+### Live Telemetry & Transaction Logs
+
+Navigate to the **Logs** tab in the dashboard to monitor live routing activity:
+- **Summary Metrics**: Real-time cards displaying Total Transactions, Estimated Token Savings, and Average Duration.
+- **Streaming Table**: Live SSE stream showing Timestamp, Action (`discover_capabilities`, `invoke_tool`, `load_skill`), Target, Latency (ms), and Tokens.
+- **Filtering & Search**: Filter transactions by action type or search queries by keyword.
+- **Detail Inspection**: Click any row to expand a sliding drawer with full input arguments, tool responses, and execution metadata.
+
+---
+
+## 9. Troubleshooting & Logs
 
 - Structured runtime logs are written to `log/agent.log`.
+- Router transaction logs are appended to `~/.koskill/cache/router_tx.log`.
 - To inspect active HTTP daemon health:
   ```bash
   curl http://127.0.0.1:3900/api/health
+  ```
+- To inspect Auto-Router status and metrics:
+  ```bash
+  curl http://127.0.0.1:3900/api/router/status
+  ```
+- To query recent router transaction logs:
+  ```bash
+  curl "http://127.0.0.1:3900/api/router/logs?limit=20"
   ```
 - To verify current conflict reports via curl:
   ```bash

@@ -2,7 +2,7 @@ import http from 'http';
 import { initSearchDb, SearchDatabase } from '../../core/search/db.js';
 import { HybridSearchEngine } from '../../core/search/hybrid.js';
 import { IncrementalIndexer } from '../../core/search/indexer.js';
-import { scanAllInventory } from '../../core/scanner/index.js';
+import { syncFullSearchIndex } from '../../core/search/sync.js';
 import { SearchItemType } from '../../core/search/types.js';
 import { defaultLogger } from '../../core/logger.js';
 
@@ -107,29 +107,14 @@ export async function handleSearchRoutes(
   // POST /api/search/reindex
   if (req.method === 'POST' && url.pathname === '/api/search/reindex') {
     try {
-      const { indexer } = getSearchComponents();
-      const inventory = await scanAllInventory();
-
-      const skillStats = await indexer.indexSkills(inventory.skills);
-      const workflowStats = await indexer.indexWorkflows(inventory.workflows);
-
-      const total = skillStats.total + workflowStats.total;
-      const indexed = skillStats.indexed + workflowStats.indexed;
-      const updated = skillStats.updated + workflowStats.updated;
-      const skipped = skillStats.skipped + workflowStats.skipped;
+      const { db } = getSearchComponents();
+      const stats = await syncFullSearchIndex(db);
 
       res.writeHead(200);
       res.end(
         JSON.stringify({
           success: true,
-          stats: {
-            skills: skillStats,
-            workflows: workflowStats,
-            total,
-            indexed,
-            updated,
-            skipped,
-          },
+          stats,
         })
       );
       return true;

@@ -9,6 +9,7 @@ import { handleConflictRoutes } from './routes/conflict.js';
 import { handleToggleRoutes } from './routes/toggle.js';
 import { handleBackupRoutes } from './routes/backup.js';
 import { handleVaultRoutes } from './routes/vault.js';
+import { handleRouterRoutes } from './routes/router.js';
 
 export interface AppServer {
   server: http.Server;
@@ -79,6 +80,9 @@ export async function startServer(preferredPort?: number): Promise<AppServer> {
 
       const vaultHandled = await handleVaultRoutes(req, res, url);
       if (vaultHandled) return;
+
+      const routerHandled = await handleRouterRoutes(req, res, url);
+      if (routerHandled) return;
     } catch (err: any) {
       defaultLogger.error('Unhandled router error', { error: err.message, path: url.pathname });
       res.writeHead(500);

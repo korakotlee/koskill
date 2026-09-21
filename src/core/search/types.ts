@@ -42,6 +42,7 @@ export interface SearchResult {
   itemType: SearchItemType;
   name: string;
   command?: string | null;
+  description?: string;
   ecosystem: string;
   sourcePath: string;
   score: number;

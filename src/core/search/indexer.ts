@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { SearchDatabase, isVectorSupported } from './db.js';
 import { SearchItemInput, SearchItemMeta, IndexSyncStats } from './types.js';
 import { LocalEmbedder, getEmbedder } from './embedder.js';
-import { SkillManifest, WorkflowManifest } from '../types.js';
+import { SkillManifest, WorkflowManifest, McpServerManifest } from '../types.js';
 import { Logger } from '../logger.js';
 
 const logger = new Logger();
@@ -172,6 +172,43 @@ export class IncrementalIndexer {
       description: w.description,
       content: w.rawContent,
     }));
+
+    return this.indexBatch(inputs);
+  }
+
+  /**
+   * Transforms and indexes tools from an array of McpServerManifest definitions.
+   */
+  public async indexMcpTools(servers: McpServerManifest[]): Promise<IndexSyncStats> {
+    const inputs: SearchItemInput[] = [];
+
+    for (const s of servers) {
+      if (!s.tools || s.tools.length === 0) continue;
+      const ecosystem = s.id?.startsWith('claude:') ? 'claude' : 'gemini';
+      const sourcePath = s.sourceConfigPath || 'mcp';
+
+      const serverCtx = [
+        s.title || s.name,
+        s.description || '',
+        s.instructions ? s.instructions.slice(0, 500) : '',
+      ].filter(Boolean).join(' - ');
+
+      for (const t of s.tools) {
+        const paramStr = t.parameters ? JSON.stringify(t.parameters) : '';
+        const content = `${s.name} MCP tool ${t.name}: ${t.description || ''}\nServer: ${serverCtx}\nParameters: ${paramStr}`;
+        inputs.push({
+          id: `mcp_tool:${s.name}:${t.name}`,
+          itemType: 'mcp_tool',
+          name: `${s.name}:${t.name}`,
+          command: s.name,
+          ecosystem,
+          sourcePath,
+          contentHash: computeContentHash(content),
+          description: t.description || `${s.name} tool ${t.name}`,
+          content,
+        });
+      }
+    }
 
     return this.indexBatch(inputs);
   }

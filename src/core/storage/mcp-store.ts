@@ -1,6 +1,5 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { McpServerInfo, McpServerManifest, McpToolDefinition } from '../types.js';
 import { getKoskillMcpDir, initCentralStore } from './store.js';
 import { defaultLogger } from '../logger.js';
@@ -50,46 +49,31 @@ export async function saveMcpRegistry(
   await fs.rename(tempPath, registryPath);
 }
 
+export { discoverServerTools, loadServerInstructions } from './mcp-discovery-helpers.js';
+import { discoverServerTools, loadServerInstructions } from './mcp-discovery-helpers.js';
+
 /**
- * Scans on-disk tool schemas for a given server name if available.
+ * Reverts a centralized MCP server by removing it from the central registry (~/.koskill/mcp/servers.json).
  */
-export async function discoverServerTools(
-  serverName: string,
-  searchDirs?: string[]
-): Promise<McpToolDefinition[]> {
-  const dirs = searchDirs || [
-    path.join(os.homedir(), '.gemini', 'antigravity-ide', 'mcp', serverName),
-    path.join(os.homedir(), '.claude', 'mcp', serverName),
-  ];
+export async function revertMcpServer(
+  serverKey: string,
+  customHome?: string
+): Promise<McpServerManifest> {
+  const registry = await loadMcpRegistry(customHome);
+  const server = registry[serverKey] || Object.values(registry).find((s) => s.id === serverKey || s.name === serverKey);
 
-  const tools: McpToolDefinition[] = [];
-
-  for (const dir of dirs) {
-    try {
-      const entries = await fs.readdir(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
-        try {
-          const content = await fs.readFile(path.join(dir, entry.name), 'utf-8');
-          const schema = JSON.parse(content);
-          if (schema && typeof schema === 'object' && schema.name) {
-            tools.push({
-              name: schema.name,
-              description: schema.description || '',
-              parameters: schema.parameters,
-            });
-          }
-        } catch {
-          // ignore corrupted schema file
-        }
-      }
-      if (tools.length > 0) break;
-    } catch {
-      // directory does not exist, continue search
-    }
+  if (!server) {
+    throw new Error(`MCP server not found in central registry: ${serverKey}`);
   }
 
-  return tools;
+  delete registry[server.name];
+  await saveMcpRegistry(registry, customHome);
+  defaultLogger.info('Reverted MCP server from registry', { name: server.name });
+
+  return {
+    ...server,
+    status: 'original',
+  };
 }
 
 /**
@@ -205,41 +189,6 @@ export async function updateServerTools(
 
   defaultLogger.info('Updated MCP server tools in registry', { name: server.name, toolsCount: tools.length });
   return server;
-}
-
-/**
- * Loads instructions.md for a given server from standard configuration directories.
- */
-export async function loadServerInstructions(
-  serverName: string,
-  searchDirs?: string[]
-): Promise<string | undefined> {
-  const baseDirs = searchDirs || [
-    path.join(os.homedir(), '.gemini', 'antigravity-ide', 'mcp'),
-    path.join(os.homedir(), '.claude', 'mcp'),
-  ];
-
-  for (const base of baseDirs) {
-    try {
-      const candidates = base.endsWith(serverName)
-        ? [path.join(base, 'instructions.md')]
-        : [path.join(base, serverName, 'instructions.md'), path.join(base, 'instructions.md')];
-
-      for (const instrPath of candidates) {
-        try {
-          const content = await fs.readFile(instrPath, 'utf-8');
-          if (content && content.trim().length > 0) {
-            return content.trim();
-          }
-        } catch {
-          // File does not exist at this candidate path
-        }
-      }
-    } catch {
-      // Continue to next directory
-    }
-  }
-  return undefined;
 }
 
 /**

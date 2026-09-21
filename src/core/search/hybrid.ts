@@ -28,22 +28,56 @@ export function calculateRrfScore(
   return score;
 }
 
+const STOP_WORDS = new Set([
+  'a', 'about', 'all', 'an', 'and', 'are', 'as', 'at', 'be', 'by',
+  'for', 'from', 'has', 'have', 'how', 'in', 'is', 'it', 'its', 'of',
+  'on', 'or', 'that', 'the', 'this', 'to', 'was', 'what', 'which', 'with'
+]);
+
 /**
- * Sanitizes input string into a safe SQLite FTS5 query with prefix matching.
+ * Detects explicit capability category preference expressed in the search query.
+ */
+export function detectCategoryIntent(query: string): 'mcp_tool' | 'workflow' | 'skill' | undefined {
+  if (/\b(tools?|mcp)\b/i.test(query)) return 'mcp_tool';
+  if (/\bworkflows?\b/i.test(query)) return 'workflow';
+  if (/\bskills?\b/i.test(query)) return 'skill';
+  return undefined;
+}
+
+/**
+ * Sanitizes input string into a safe SQLite FTS5 query with prefix matching,
+ * stop word filtering, and technical compound phrase normalization.
  */
 export function sanitizeFtsQuery(rawQuery: string): string {
-  const tokens = rawQuery
+  let normalized = rawQuery.toLowerCase();
+  if (normalized.includes('code base')) {
+    normalized = normalized.replace(/code\s+base/g, 'codebase');
+  }
+
+  const rawTokens = normalized
     .replace(/[^\p{L}\p{N}_]/gu, ' ')
     .trim()
     .split(/\s+/)
     .filter(Boolean);
 
+  let tokens = rawTokens.filter((t) => !STOP_WORDS.has(t));
+  if (tokens.length === 0) {
+    tokens = rawTokens;
+  }
+
   if (tokens.length === 0) {
     return '""';
   }
 
-  // Join with OR and prefix wildcards
-  return tokens.map((t) => `"${t}"*`).join(' OR ');
+  const tokenSet = new Set<string>();
+  for (const t of tokens) {
+    tokenSet.add(t);
+    if (t === 'codebase') {
+      tokenSet.add('code');
+    }
+  }
+
+  return Array.from(tokenSet).map((t) => `"${t}"*`).join(' OR ');
 }
 
 /**
@@ -74,7 +108,7 @@ export class HybridSearchEngine {
     options: SearchOptions = {}
   ): Promise<SearchResult[]> {
     const limit = options.limit ?? 10;
-    const fetchLimit = limit * 3;
+    const fetchLimit = Math.max(limit * 5, 120);
     const vectorUsable = !this.disableVector && isVectorSupported(this.db);
 
     // 1. Run FTS5 BM25 search
@@ -134,11 +168,19 @@ export class HybridSearchEngine {
       return [];
     }
 
-    // 4. Batch query metadata
+    // 4. Batch query metadata and descriptions
     const placeholders = Array.from(candidateIds).map(() => '?').join(',');
     const metaRows = this.db
       .prepare(`SELECT * FROM items_meta WHERE id IN (${placeholders})`)
       .all(...Array.from(candidateIds)) as Record<string, unknown>[];
+
+    const ftsRows = this.db
+      .prepare(`SELECT id, description FROM items_fts WHERE id IN (${placeholders})`)
+      .all(...Array.from(candidateIds)) as { id: string; description?: string }[];
+    const descMap = new Map<string, string>();
+    for (const d of ftsRows) {
+      if (d.description) descMap.set(d.id, d.description);
+    }
 
     const metaMap = new Map<string, SearchItemMeta>();
     for (const r of metaRows) {
@@ -170,7 +212,16 @@ export class HybridSearchEngine {
       const vInfo = vecRanks.get(id);
       const vecRank = vInfo?.rank;
       const bm25Rank = ftsRanks.get(id);
-      const score = calculateRrfScore(vecRank, bm25Rank, this.rrfK);
+      let score = calculateRrfScore(vecRank, bm25Rank, this.rrfK);
+
+      const intent = detectCategoryIntent(query);
+      if (!options.itemType && intent) {
+        if (meta.itemType === intent) {
+          score *= 1.25;
+        } else {
+          score *= 0.85;
+        }
+      }
 
       if (options.minScore && score < options.minScore) {
         continue;
@@ -181,6 +232,7 @@ export class HybridSearchEngine {
         itemType: meta.itemType,
         name: meta.name,
         command: meta.command,
+        description: descMap.get(meta.id),
         ecosystem: meta.ecosystem,
         sourcePath: meta.sourcePath,
         score,

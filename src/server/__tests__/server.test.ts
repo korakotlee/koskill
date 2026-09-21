@@ -43,4 +43,31 @@ describe('Server Scaffolding & Health Check Daemon', () => {
 
     expect(response.statusCode).toBe(404);
   });
+
+  it('dynamically falls back to next available port on collision', async () => {
+    appServer = await startServer(3903);
+    expect(appServer.port).toBe(3903);
+
+    const secondServer = await startServer(3903);
+    try {
+      expect(secondServer.port).toBe(3904);
+    } finally {
+      await secondServer.close();
+    }
+  });
+
+  it('serves static UI or fallback on root path /', async () => {
+    appServer = await startServer(3905);
+
+    const response = await new Promise<{ statusCode: number; data: string }>((resolve, reject) => {
+      http.get(`http://localhost:${appServer?.port}/`, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => { resolve({ statusCode: res.statusCode || 0, data }); });
+      }).on('error', reject);
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.data.length).toBeGreaterThan(0);
+  });
 });

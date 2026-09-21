@@ -78,11 +78,12 @@ flowchart LR
 - **Global Discovery**: Automatically scan global and workspace configurations from Gemini CLI, AntiGravity (AGY), Codex, Claude Code, and Cloud Code for skills, custom workflows, and MCP servers.
 - **Workflow & Slash Command Support**: Discover and inspect custom slash commands across Gemini CLI (`~/.gemini/config/global_workflows/`, `.agent/workflows/`) and Claude Code (`~/.claude/commands/`, `.claude/commands/`) with dedicated syntax hints and permission views.
 - **Model Context Protocol (MCP) Live Discovery**: Proactively probe running MCP servers via the modern stateless `server/discover` JSON-RPC method with graceful fallbacks to legacy `initialize` handshakes and local filesystem `instructions.md` guides, extracting server titles, versions, descriptions, and agent prompt instructions.
-- **Central Storage & Symlinking**: Consolidate scattered configurations into `~/.koskill/` and manage symlinks to target environments transparently. User can pick and choose which one they want to leave in the original config or move / symlink to ~/.koskill
-- **Embedded Hybrid Search**: Sub-30ms similarity scoring and lexical search combining `sqlite-vec` dense embeddings and SQLite FTS5 BM25 with Reciprocal Rank Fusion (RRF) at `~/.koskill/cache/index.db`.
+- **Central Storage & Symlinking**: Consolidate scattered configurations into `~/.koskill/` and manage symlinks to target environments transparently. Users can pick and choose individual skills, workflows, or MCP servers to centralize or revert back to original configurations with single-click UI controls.
+- **Embedded Hybrid Search**: Sub-30ms similarity scoring and lexical search combining `sqlite-vec` dense embeddings and SQLite FTS5 BM25 with Reciprocal Rank Fusion (RRF) at `~/.koskill/cache/index.db`. Automatically indexes skills, custom workflows, and individual MCP tools from both local configs and central registries.
 - **Local ONNX Embeddings**: Zero-cloud inference using `@xenova/transformers` (384 dimensions) with lazy loading to guarantee sub-200ms cold starts.
 - **Tiered Conflict & Deduplication Engine**: Detect exact name collisions, identical SHA-256 CAS content hashes, colliding MCP tool signatures across servers, semantic duplicates (cosine similarity >= 0.85), and prompt instruction divergences on shared command triggers.
 - **Side-by-Side Diff & Resolution UI**: Compare conflicting `SKILL.md` instructions with unified line diffs, similarity match badges (e.g. "94% Match"), and execute atomic `PICK` (keep winner, archive loser), `ALIAS` (rename), or `MERGE` (combine configs) actions with optimistic CAS hash validation and pre-resolution snapshot backups.
+- **Auto-Router & Meta-MCP Server**: Replaces dozens of registered tools with 3 lightweight meta-tools (`discover_capabilities`, `invoke_tool`, `load_skill`) reducing agent context consumption by up to 87%. Features lazy downstream process pooling (max 5 servers, 5-minute LRU idle cleanup, 15-second execution timeouts), dynamic MCP tool capability discovery, atomic reversible prompt takeover, WAL transaction telemetry (`~/.koskill/cache/router_tx.log`), live SSE streaming, and CLI commands (`koskill router run`, `koskill reindex`).
 - **Instant Activation Toggles**: Enable or disable specific skills, workflows, and MCP servers with atomic filesystem operations (`.disabled` extension renaming or symlink unlinking) ensuring immediate invisibility to CLI agents, exposed via `POST /api/:entityType/:id/toggle` and dashboard toggle controls.
 - **Machine-to-Machine Backup & Restore**: Export centralized assets (`~/.koskill/skills`, `workflows`, `mcp`, `journal.json`) into portable `.tar.gz` archives with embedded `backup-manifest.json` and restore them on new development workstations with strict tar-slip directory traversal prevention and collision safeguards.
 - **Local Credential Vault**: Securely manage sensitive API keys and tokens in an isolated local vault at `~/.koskill/vault/secrets.json` enforced with POSIX `0600` file permissions, secret masking in REST responses, and an interactive UI configuration drawer.
@@ -116,6 +117,7 @@ koskill/
 │   │   ├── backup/            # Backup exporter, importer, and tar-slip protection
 │   │   ├── conflict/          # Conflict detector, semantic matcher, and resolver
 │   │   ├── mcp/               # Model Context Protocol discovery client
+│   │   ├── router/            # Auto-Router Meta-MCP server, proxy, and WAL logger
 │   │   ├── scanner/           # Discovery scanner for Gemini and Claude
 │   │   ├── search/            # Embedded hybrid search engine (sqlite-vec + BM25)
 │   │   ├── storage/           # Central store, symlink manager, and journal
@@ -123,8 +125,9 @@ koskill/
 │   │   ├── vault/             # POSIX 0600 local credential vault
 │   │   ├── logger.ts          # Centralized structured logger
 │   │   └── types.ts           # Shared domain types and type guards
+│   ├── cli/                   # CLI entrypoints and commands (koskill router run)
 │   ├── server/                # Node.js HTTP daemon
-│   │   ├── routes/            # REST API route handlers (toggle, backup, vault, etc.)
+│   │   ├── routes/            # REST API route handlers (router, toggle, backup, vault)
 │   │   └── index.ts           # Daemon entrypoint and router pipeline
 │   └── client/                # React + Vite frontend application
 │       ├── index.html         # Frontend HTML entrypoint
@@ -152,6 +155,12 @@ koskill/
 ```bash
 # Launch the local dashboard via npx
 npx koskill
+
+# Run the Auto-Router Meta-MCP stdio server
+npx koskill router run
+
+# Synchronize skills, workflows, and MCP tools in the local vector database
+npx koskill reindex
 ```
 
 ### Local Development Setup
@@ -164,6 +173,9 @@ cd koskill
 
 # Install dependencies
 npm install
+
+# Link the CLI globally to enable `koskill` in PATH for MCP and terminal use
+npm link
 
 # Start development server (Node API on port 3900 + Vite frontend on port 5173)
 npm run dev

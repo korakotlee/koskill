@@ -28,8 +28,42 @@ This guide covers setup, discovery workflows, and the Conflict Detection and Res
 
 ## 2. Quick Start
 
-1. Start the server and client concurrently:
+### Installation & Global CLI
+
+You can run KoSkill without installation using `npx`, or install it globally via Homebrew or npm:
+
+```bash
+# Option 1: Instant run with npx (zero installation)
+npx koskill
+
+# Option 2: Install via Homebrew Tap (macOS / Linux)
+brew tap korakotlee/koskill
+brew install koskill
+
+# Option 3: Install globally via npm
+npm install -g koskill
+```
+
+### Running the Web Dashboard
+
+Execute `koskill` from ANY directory in your terminal:
+```bash
+koskill
+```
+- The daemon automatically starts on `http://127.0.0.1:3900` (or the next free port if 3900 is in use).
+- Your default web browser opens to the cockpit dashboard automatically.
+- To prevent opening the browser, add the `--no-open` flag: `koskill --no-open`.
+- Press `Ctrl+C` to gracefully terminate the daemon process.
+
+### Theme & Aesthetics
+
+- Click the emoji theme toggle button (🌙 / ☀️) in the top-right header to switch seamlessly between dark and light modes.
+- Tables display pulsing skeleton placeholders during initial background discovery scans to prevent layout shifts.
+
+### Local Development Setup
+1. Clone the repository and run development servers concurrently:
    ```bash
+   npm install
    npm run dev
    ```
 2. Open `http://localhost:5173` in your browser.

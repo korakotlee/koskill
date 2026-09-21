@@ -11,6 +11,7 @@ export interface McpDetailViewProps {
   onBack: () => void;
   onToggleEnabled?: (server: McpServerManifest, enabled: boolean) => Promise<void> | void;
   onCentralize?: (server: McpServerManifest) => Promise<void> | void;
+  onRevert?: (server: McpServerManifest) => Promise<void> | void;
   onQueryTools?: (server: McpServerManifest) => Promise<any> | void;
   onDiscoverServer?: (server: McpServerManifest) => Promise<any> | void;
 }
@@ -23,6 +24,7 @@ export const McpDetailView: React.FC<McpDetailViewProps> = ({
   onBack,
   onToggleEnabled,
   onCentralize,
+  onRevert,
   onQueryTools,
   onDiscoverServer,
 }) => {
@@ -70,6 +72,16 @@ export const McpDetailView: React.FC<McpDetailViewProps> = ({
     setIsUpdating(true);
     try {
       await onCentralize(server);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleRevert = async () => {
+    if (!onRevert) return;
+    setIsUpdating(true);
+    try {
+      await onRevert(server);
     } finally {
       setIsUpdating(false);
     }
@@ -169,6 +181,21 @@ export const McpDetailView: React.FC<McpDetailViewProps> = ({
               }}
             >
               {isUpdating ? 'Saving...' : 'Centralize Server'}
+            </button>
+          )}
+
+          {isCentralized && onRevert && (
+            <button
+              type="button"
+              className="Btn"
+              onClick={handleRevert}
+              disabled={isUpdating}
+              style={{
+                fontSize: '13px',
+                fontWeight: 600,
+              }}
+            >
+              {isUpdating ? 'Reverting...' : 'Revert to Original'}
             </button>
           )}
 

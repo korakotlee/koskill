@@ -50,6 +50,17 @@ describe('McpServerList Component Discovery Enrichment', () => {
     fireEvent.click(discoverBtn);
     expect(onDiscover).toHaveBeenCalledWith(mockDiscoveredServer);
   });
+
+  it('renders Revert button when server is centralized and triggers callback', () => {
+    const onRevert = vi.fn();
+    render(<McpServerList servers={[mockDiscoveredServer]} onRevertServer={onRevert} />);
+
+    const revertBtn = screen.getByRole('button', { name: /Revert/i });
+    expect(revertBtn).toBeDefined();
+
+    fireEvent.click(revertBtn);
+    expect(onRevert).toHaveBeenCalledWith(mockDiscoveredServer);
+  });
 });
 
 describe('McpDetailView Component Discovery Enrichment', () => {

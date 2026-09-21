@@ -104,4 +104,26 @@ rl.on('line', (line) => {
     expect(Array.isArray(body.results)).toBe(true);
     expect(typeof body.total).toBe('number');
   });
+
+  it('POST /api/mcp/:name/revert removes server from central registry and returns status original', async () => {
+    const mockServer: McpServerManifest = {
+      id: 'gemini:server-to-revert',
+      name: 'server-to-revert',
+      transport: 'stdio',
+      command: 'echo',
+      args: ['hello'],
+      declaredToolsCount: 1,
+    };
+    await centralizeMcpServer(mockServer);
+
+    const revertRes = await fetch(`${baseUrl}/api/mcp/server-to-revert/revert`, {
+      method: 'POST',
+    });
+    expect(revertRes.status).toBe(200);
+    const revertBody = await revertRes.json();
+    expect(revertBody.success).toBe(true);
+    expect(revertBody.server.name).toBe('server-to-revert');
+    expect(revertBody.server.status).toBe('original');
+  });
 });
+

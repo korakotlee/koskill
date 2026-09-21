@@ -20,11 +20,13 @@ describe('KoSkill Primer Dashboard Shell', () => {
     const skillsTab = screen.getByRole('button', { name: /Skills/i });
     const mcpTab = screen.getByRole('button', { name: /MCP Servers/i });
     const conflictsTab = screen.getByRole('button', { name: /Conflicts/i });
+    const logsTab = screen.getByRole('button', { name: /Logs/i });
     const settingsTab = screen.getByRole('button', { name: /Settings/i });
 
     expect(skillsTab).toBeDefined();
     expect(mcpTab).toBeDefined();
     expect(conflictsTab).toBeDefined();
+    expect(logsTab).toBeDefined();
     expect(settingsTab).toBeDefined();
   });
 
@@ -34,6 +36,11 @@ describe('KoSkill Primer Dashboard Shell', () => {
     fireEvent.click(mcpTab);
     expect(mcpTab.classList.contains('selected')).toBe(true);
     expect(screen.getByText(/Active Model Context Protocol Servers/i)).toBeDefined();
+
+    const logsTab = screen.getByRole('button', { name: /Logs/i });
+    fireEvent.click(logsTab);
+    expect(logsTab.classList.contains('selected')).toBe(true);
+    expect(screen.getByText(/Active Child Servers/i)).toBeDefined();
   });
 
   it('toggles dark and light mode', () => {

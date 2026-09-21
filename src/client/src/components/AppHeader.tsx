@@ -84,8 +84,20 @@ export function AppHeader({
           className="Theme-toggle"
           onClick={onToggleTheme}
           aria-label="Toggle Theme"
+          title={`Switch to ${colorMode === 'light' ? 'dark' : 'light'} theme`}
+          style={{
+            fontSize: '16px',
+            lineHeight: 1,
+            padding: '6px 10px',
+            cursor: 'pointer',
+            borderRadius: '6px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease',
+          }}
         >
-          Theme: {colorMode === 'light' ? 'Light' : 'Dark'}
+          {colorMode === 'light' ? '🌙' : '☀️'}
         </button>
       </div>
     </header>

@@ -216,6 +216,7 @@ export default function App(): React.ReactElement {
             {activeTab === 'skills' && (
               <DiscoveryTable
                 skills={skills}
+                isLoading={isRefreshing}
                 onSelectSkill={(skill) => setSelectedSkill(skill)}
                 onCentralizeSkill={handleCentralizeSkill}
                 onRevertSkill={handleRevertSkill}
@@ -227,6 +228,7 @@ export default function App(): React.ReactElement {
             {activeTab === 'workflows' && (
               <DiscoveryTable
                 workflows={workflows}
+                isLoading={isRefreshing}
                 onSelectWorkflow={(wf) => setSelectedWorkflow(wf)}
                 onCentralizeWorkflow={handleCentralizeWorkflow}
                 onRevertWorkflow={handleRevertWorkflow}

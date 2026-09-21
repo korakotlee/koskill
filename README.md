@@ -97,7 +97,7 @@ flowchart LR
 - **Core Engine**: TypeScript modular services
 - **Search & Vectors**: SQLite with `sqlite-vec` (dense vector embeddings) and FTS5 (BM25 lexical search)
 - **Local Embeddings**: `@xenova/transformers` (local ONNX neural inference)
-- **Distribution**: npm CLI package (`npx koskill`), optional Homebrew tap planned
+- **Distribution**: Standalone npm CLI executable (`koskill`, `npx koskill`), Homebrew tap formula
 - **Storage**: Local filesystem (`~/.koskill`, system config directories)
 
 ---
@@ -107,7 +107,9 @@ flowchart LR
 ```text
 koskill/
 ├── .agent/                    # Agent workflows and custom skill definitions
+├── bin/                       # Executable CLI wrapper (bin/koskill)
 ├── docs/                      # Architectural, design, and user guides
+├── Formula/                   # Homebrew formula specification (Formula/koskill.rb)
 ├── log/                       # Operational and agent trace logs
 │   └── agent.log              # Agent run and structured logs
 ├── openspec/                  # Spec-driven development changes and specs
@@ -125,14 +127,16 @@ koskill/
 │   │   ├── vault/             # POSIX 0600 local credential vault
 │   │   ├── logger.ts          # Centralized structured logger
 │   │   └── types.ts           # Shared domain types and type guards
-│   ├── cli/                   # CLI entrypoints and commands (koskill router run)
-│   ├── server/                # Node.js HTTP daemon
+│   ├── cli/                   # CLI entrypoints and commands (koskill, router, reindex)
+│   ├── server/                # Node.js HTTP daemon with static asset serving & port fallback
 │   │   ├── routes/            # REST API route handlers (router, toggle, backup, vault)
+│   │   ├── static.ts          # Embedded static asset handler with SPA routing fallback
+│   │   ├── port.ts            # Dynamic port discovery and collision fallback
 │   │   └── index.ts           # Daemon entrypoint and router pipeline
 │   └── client/                # React + Vite frontend application
 │       ├── index.html         # Frontend HTML entrypoint
 │       └── src/               # React components, styles, hooks, and tests
-├── tests/                     # Automated unit, route, and component tests
+├── tests/                     # Automated unit, route, CLI, and component tests
 ├── AGENTS.md                  # Operational rules and coding invariants for AI agents
 ├── CHANGELOG.md               # Release notes following Keep a Changelog
 ├── package.json               # Root workspace manifest and scripts
@@ -153,14 +157,24 @@ koskill/
 ### Quick Start (CLI)
 
 ```bash
-# Launch the local dashboard via npx
+# Launch the local dashboard via npx (zero installation required)
 npx koskill
 
+# Or install globally via Homebrew (macOS / Linux)
+brew tap korakotlee/koskill
+brew install koskill
+
+# Or install globally via npm
+npm install -g koskill
+
+# Launch web dashboard daemon from any directory
+koskill
+
 # Run the Auto-Router Meta-MCP stdio server
-npx koskill router run
+koskill router run
 
 # Synchronize skills, workflows, and MCP tools in the local vector database
-npx koskill reindex
+koskill reindex
 ```
 
 ### Local Development Setup

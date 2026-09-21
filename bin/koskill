@@ -9,7 +9,7 @@ const rootDir = path.resolve(__dirname, '..');
 const tsEntry = path.join(rootDir, 'src', 'cli', 'index.ts');
 const jsEntry = path.join(rootDir, 'dist', 'cli', 'index.js');
 
-const useJs = fs.existsSync(jsEntry) && !fs.existsSync(tsEntry);
+const useJs = fs.existsSync(jsEntry);
 const entry = useJs ? jsEntry : tsEntry;
 
 let tsxLoader = 'tsx';
@@ -26,6 +26,7 @@ const args = useJs
 const child = spawn(process.execPath, args, {
   stdio: 'inherit',
   env: process.env,
+  cwd: process.cwd()
 });
 
 process.on('SIGINT', () => child.kill('SIGINT'));

@@ -10,6 +10,8 @@ import { handleToggleRoutes } from './routes/toggle.js';
 import { handleBackupRoutes } from './routes/backup.js';
 import { handleVaultRoutes } from './routes/vault.js';
 import { handleRouterRoutes } from './routes/router.js';
+import { handleStaticRoutes } from './static.js';
+import { findAvailablePort } from './port.js';
 
 export interface AppServer {
   server: http.Server;
@@ -23,13 +25,14 @@ export interface AppServer {
  * @param preferredPort Port number to listen on (defaults to 3900 or PORT env var)
  */
 export async function startServer(preferredPort?: number): Promise<AppServer> {
-  const port = preferredPort !== undefined ? preferredPort : (Number(process.env.PORT) || 3900);
+  const defaultPort = Number(process.env.PORT) || 3900;
+  const requestedPort = preferredPort !== undefined ? preferredPort : defaultPort;
+  const port = await findAvailablePort(requestedPort);
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`);
 
     // Standard headers
-    res.setHeader('Content-Type', 'application/json');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -85,12 +88,22 @@ export async function startServer(preferredPort?: number): Promise<AppServer> {
       if (routerHandled) return;
     } catch (err: any) {
       defaultLogger.error('Unhandled router error', { error: err.message, path: url.pathname });
+      res.setHeader('Content-Type', 'application/json');
       res.writeHead(500);
       res.end(JSON.stringify({ error: 'Internal Server Error' }));
       return;
     }
 
+    // Static asset handling (SPA and bundled client files)
+    try {
+      const staticHandled = await handleStaticRoutes(req, res, url);
+      if (staticHandled) return;
+    } catch (err: any) {
+      defaultLogger.error('Static route error', { error: err.message, path: url.pathname });
+    }
+
     // 404 Not Found fallback
+    res.setHeader('Content-Type', 'application/json');
     res.writeHead(404);
     res.end(JSON.stringify({
       error: 'Not Found',

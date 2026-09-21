@@ -28,9 +28,21 @@ This document provides a comprehensive technical reference for engineers, DevOps
 - `npm`
 
 ### Running the Application
-To run the server daemon and Vite client concurrently:
+To run the server daemon and Vite client concurrently in development:
 ```bash
 npm run dev
+```
+
+To build production bundles and test the standalone executable:
+```bash
+# Build Vite client assets into dist/client/ and compile types
+npm run build
+
+# Run the standalone executable CLI directly
+./bin/koskill
+
+# Or run without opening browser
+./bin/koskill --no-open
 ```
 
 To run only the backend daemon on port 3900:
@@ -42,6 +54,12 @@ To run only the frontend dev server on port 5173:
 ```bash
 npm run dev:client
 ```
+
+### Production Packaging & Port Allocation
+- **CLI Wrapper (`bin/koskill`)**: Standalone executable shebang (`#!/usr/bin/env node`) that isolates the user workspace (`process.cwd()`) from package assets (`import.meta.url`).
+- **Dynamic Port Allocation (`src/server/port.ts`)**: Probes port 3900 on `127.0.0.1`. If occupied, dynamically scans consecutive fallback ports (3901..3910).
+- **Embedded Static Asset Middleware (`src/server/static.ts`)**: Serves bundled production assets from `dist/client/` with SPA routing fallback to `index.html`.
+- **Homebrew Formula (`Formula/koskill.rb`)**: Supports packaging and distribution via custom Homebrew taps (`brew install koskill`).
 
 ---
 

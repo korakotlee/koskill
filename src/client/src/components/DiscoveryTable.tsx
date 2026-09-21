@@ -4,10 +4,12 @@ import { BatchActionBar } from './BatchActionBar.js';
 import { CentralizeConfirmModal, ConfirmModalItem } from './CentralizeConfirmModal.js';
 import { WorkflowTableRows } from './WorkflowTableRows.js';
 import { SkillTableRows } from './SkillTableRows.js';
+import { SkeletonRow } from './LoadingSkeleton.js';
 
 export interface DiscoveryTableProps {
   skills?: SkillManifest[];
   workflows?: WorkflowManifest[];
+  isLoading?: boolean;
   onSelectSkill?: (skill: SkillManifest) => void;
   onSelectWorkflow?: (workflow: WorkflowManifest) => void;
   onCentralizeSkill?: (skill: SkillManifest) => Promise<void> | void;
@@ -23,6 +25,7 @@ export interface DiscoveryTableProps {
 export const DiscoveryTable: React.FC<DiscoveryTableProps> = ({
   skills,
   workflows,
+  isLoading,
   onSelectSkill,
   onSelectWorkflow,
   onCentralizeSkill,
@@ -214,7 +217,17 @@ export const DiscoveryTable: React.FC<DiscoveryTableProps> = ({
           </span>
         </div>
 
-        {filteredCount === 0 ? (
+        {isLoading && itemsCount === 0 ? (
+          <div style={{ padding: '8px 16px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                <SkeletonRow columns={isWorkflowMode ? 4 : 5} />
+                <SkeletonRow columns={isWorkflowMode ? 4 : 5} />
+                <SkeletonRow columns={isWorkflowMode ? 4 : 5} />
+              </tbody>
+            </table>
+          </div>
+        ) : filteredCount === 0 ? (
           <div className="Box-row" style={{ color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>
             No matching items found.
           </div>

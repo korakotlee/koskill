@@ -251,3 +251,40 @@ body {
   border: 1px solid var(--color-border-default);
 }
 
+/* Skeleton & Micro-Animations */
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.skeleton-pulse {
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+.skeleton-row td {
+  border-top: 1px solid var(--color-border-muted);
+}
+
+.Theme-toggle {
+  background: var(--color-canvas-subtle);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-fg-default);
+}
+
+.Theme-toggle:hover {
+  transform: scale(1.08);
+  border-color: var(--color-accent-fg);
+}
+
+.Theme-toggle:active {
+  transform: scale(0.95);
+}
+
+body, .Box, .App-header, .UnderlineNav-item {
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+

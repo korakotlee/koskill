@@ -1,0 +1,122 @@
+/* Router Telemetry & Logs */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.metric-card {
+  background: var(--color-canvas-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  padding: 14px 18px;
+}
+.metric-label {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-fg-default);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.metric-sub {
+  font-size: 12px;
+  color: var(--color-success-fg);
+  font-weight: 500;
+}
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+.search-input {
+  flex: 1;
+  background: var(--color-canvas-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--color-fg-default);
+}
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-success-fg);
+  background: var(--color-success-subtle);
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-success-fg);
+}
+.badge-action {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.badge-discover { background: #ddf4ff; color: #0969da; }
+.badge-invoke { background: #dafbe1; color: #1a7f37; }
+.badge-load { background: #fff8c5; color: #9a6700; }
+.chip-ms {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+.chip-tokens {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--color-success-fg);
+  font-weight: 600;
+}
+.settled-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-success-subtle);
+  color: var(--color-success-fg);
+  font-size: 10px;
+  font-weight: 600;
+}
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-default);
+}
+.drawer-title { font-size: 15px; font-weight: 600; }
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--color-fg-muted);
+}
+.code-block {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  background: var(--color-canvas-subtle);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+}

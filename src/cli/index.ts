@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import { runRouterCommand } from './commands/router.js';
 import { runReindexCommand } from './commands/reindex.js';
+import { runDaemonCommand, DaemonOptions } from './commands/daemon.js';
+
+export interface CliOptions extends DaemonOptions {}
 
 /**
  * Universal CLI entrypoint for KoSkill.
@@ -8,19 +11,30 @@ import { runReindexCommand } from './commands/reindex.js';
 export async function runCli(
   args: string[] = process.argv.slice(2),
   stdin: NodeJS.ReadableStream = process.stdin,
-  stdout: NodeJS.WritableStream = process.stdout
+  stdout: NodeJS.WritableStream = process.stdout,
+  options: CliOptions = {}
 ): Promise<void> {
   const command = args[0];
   const subArgs = args.slice(1);
 
-  if (!command || command === '--help' || command === '-h') {
+  if (command === '--help' || command === '-h') {
     stdout.write(
-      `Usage: koskill <command> [options]\n\n` +
+      `Usage: koskill [command] [options]\n\n` +
+      `Universal developer tool for cross-agent skill and MCP synchronization.\n\n` +
       `Commands:\n` +
-      `  router    Manage and run the KoSkill Meta-MCP Auto-Router\n` +
-      `  reindex   Synchronize skills, workflows, and MCP tools in search index\n` +
-      `  --help    Show this help message\n`
+      `  (default)  Launch the local dashboard daemon and open browser\n` +
+      `  router     Manage and run the KoSkill Meta-MCP Auto-Router\n` +
+      `  reindex    Synchronize skills, workflows, and MCP tools in search index\n` +
+      `  --help     Show this help message\n\n` +
+      `Options:\n` +
+      `  --no-open  Start daemon without opening the web browser\n`
     );
+    return;
+  }
+
+  // Default invocation without subcommands or explicit start/dashboard
+  if (!command || command === 'start' || command === 'dashboard') {
+    await runDaemonCommand(args, stdout, options);
     return;
   }
 
